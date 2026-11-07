@@ -1,0 +1,420 @@
+<mxfile host="localhost" pages="5">
+  <diagram id="j2nclfkz-eyob" name="1-总体架构">
+    <mxGraphModel dx="2526" dy="1093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" parent="1" style="text;fontSize=18;fontStyle=1;align=left;whiteSpace=wrap;html=1;" value="Kafka Pilot 总体架构（分层）" vertex="1">
+          <mxGeometry height="30" width="360" x="40" y="8" as="geometry"/>
+        </mxCell>
+        <mxCell id="3" parent="1" style="rounded=1;fillColor=none;strokeColor=#9e9e9e;dashed=1;fontSize=12;fontStyle=1;whiteSpace=wrap;html=1;" value="使用方" vertex="1">
+          <mxGeometry height="58" width="88" x="30" y="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="4" parent="1" style="rounded=1;fillColor=none;strokeColor=#9e9e9e;dashed=1;fontSize=12;fontStyle=1;whiteSpace=wrap;html=1;" value="接入层" vertex="1">
+          <mxGeometry height="58" width="88" x="30" y="143" as="geometry"/>
+        </mxCell>
+        <mxCell id="5" parent="1" style="rounded=1;fillColor=none;strokeColor=#9e9e9e;dashed=1;fontSize=12;fontStyle=1;whiteSpace=wrap;html=1;" value="用例层" vertex="1">
+          <mxGeometry height="58" width="88" x="30" y="231" as="geometry"/>
+        </mxCell>
+        <mxCell id="6" parent="1" style="rounded=1;fillColor=none;strokeColor=#9e9e9e;dashed=1;fontSize=12;fontStyle=1;whiteSpace=wrap;html=1;" value="内核层" vertex="1">
+          <mxGeometry height="72" width="88" x="30" y="319" as="geometry"/>
+        </mxCell>
+        <mxCell id="7" parent="1" style="rounded=1;fillColor=none;strokeColor=#9e9e9e;dashed=1;fontSize=12;fontStyle=1;whiteSpace=wrap;html=1;" value="外部依赖" vertex="1">
+          <mxGeometry height="58" width="88" x="30" y="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="AI Agent&lt;br&gt;（Skill over CLI 调用）" vertex="1">
+          <mxGeometry height="58" width="250" x="132" y="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;whiteSpace=wrap;html=1;" value="人类用户&lt;br&gt;（Windows 客户端：可写操作 + 只读 AI 轨迹）" vertex="1">
+          <mxGeometry height="58" width="330" x="430" y="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="CLI 接口层　kp&lt;br&gt;cobra 子命令 · JSON 输出 · 稳定退出码" vertex="1">
+          <mxGeometry height="58" width="250" x="132" y="143" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;whiteSpace=wrap;html=1;" value="本地服务层　kp serve&lt;br&gt;127.0.0.1 HTTP + SSE（本地工具，无认证鉴权）" vertex="1">
+          <mxGeometry height="58" width="330" x="430" y="143" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;whiteSpace=wrap;html=1;" value="internal/app 用例编排层&lt;br&gt;Scan · Produce · Inspect · Audit 四类用例，CLI 与本地服务共用同一条执行链路" vertex="1">
+          <mxGeometry height="58" width="628" x="132" y="231" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" value="配置与连接&lt;br&gt;profile · SASL/TLS · 客户端池" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="132" y="319" width="145" height="72" as="geometry"/></mxCell>
+        <mxCell id="16" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;whiteSpace=wrap;html=1;" value="扫描与过滤&lt;br&gt;offset 定位 · 分区并行 · 三层过滤" vertex="1">
+          <mxGeometry height="72" width="145" x="293" y="319" as="geometry"/>
+        </mxCell>
+        <mxCell id="17" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;whiteSpace=wrap;html=1;" value="注入引擎&lt;br&gt;单条 · JS 生成器 · 背压管道" vertex="1">
+          <mxGeometry height="72" width="145" x="454" y="319" as="geometry"/>
+        </mxCell>
+        <mxCell id="18" value="审计与轨迹&lt;br&gt;最终结果 + 命中快照" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="615" y="319" width="145" height="72" as="geometry"/></mxCell>
+        <mxCell id="19" value="Kafka 集群&lt;br&gt;开发 / 测试环境（明文 / SASL / TLS / SASL+TLS 可选）" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="132" y="450" width="430" height="58" as="geometry"/></mxCell>
+        <mxCell id="20" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;whiteSpace=wrap;html=1;" value="本地存储&lt;br&gt;SQLite（audit.db）" vertex="1">
+          <mxGeometry height="58" width="160" x="600" y="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;html=1;" target="12" value="调用">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;html=1;" target="13" value="HTTP / SSE">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" edge="1" parent="1" source="12" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.199;entryY=0;html=1;" target="14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.737;entryY=0;html=1;" target="14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;exitX=0.115;exitY=1;entryX=0.5;entryY=0;html=1;" target="15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;exitX=0.372;exitY=1;entryX=0.5;entryY=0;html=1;" target="16">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;exitX=0.628;exitY=1;entryX=0.5;entryY=0;html=1;" target="17">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;exitX=0.884;exitY=1;entryX=0.5;entryY=0;html=1;" target="18">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" edge="1" parent="1" source="15" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.169;entryY=0;html=1;" target="19" value="fetch / produce">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" edge="1" parent="1" source="16" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.543;entryY=0;html=1;" target="19" value="fetch">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="40" edge="1" parent="1" source="17" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.917;entryY=0;html=1;" target="19" value="produce">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" edge="1" parent="1" source="18" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.547;entryY=0;html=1;" target="20">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="irtrcugx-d7s5" name="2-内核模块分解">
+    <mxGraphModel dx="2186" dy="1093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" parent="1" style="text;fontSize=18;fontStyle=1;align=left;whiteSpace=wrap;html=1;" value="内核模块分解（internal/）" vertex="1">
+          <mxGeometry height="30" width="360" x="40" y="10" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;whiteSpace=wrap;html=1;" value="internal/app 用例编排层　——　CLI 与本地服务的唯一入口，保证两端行为一致" vertex="1">
+          <mxGeometry height="44" width="732" x="24" y="60" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" value="&lt;b&gt;config&lt;/b&gt;&lt;br&gt;profile + SASL/TLS&lt;br&gt;凭据加解密（DPAPI）&lt;br&gt;仅内核持有" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="24" y="145" width="112" height="112" as="geometry"/></mxCell>
+        <mxCell id="12" value="&lt;b&gt;kafka&lt;/b&gt;&lt;br&gt;连接池（SASL/TLS）&lt;br&gt;元数据 / 分区&lt;br&gt;offset 定位 · lag" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="148" y="145" width="112" height="112" as="geometry"/></mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;whiteSpace=wrap;html=1;" value="&lt;b&gt;scan&lt;/b&gt;&lt;br&gt;分区并行读取&lt;br&gt;时间 / 条数边界&lt;br&gt;跨分区归并" vertex="1">
+          <mxGeometry height="112" width="112" x="272" y="145" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;whiteSpace=wrap;html=1;" value="&lt;b&gt;filter&lt;/b&gt;&lt;br&gt;key 精确 / 正则&lt;br&gt;value 关键词&lt;br&gt;jq 表达式（默认）&lt;br&gt;Decoder 插件扩展" vertex="1">
+          <mxGeometry height="112" width="112" x="396" y="145" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;whiteSpace=wrap;html=1;" value="&lt;b&gt;produce&lt;/b&gt;&lt;br&gt;单条注入&lt;br&gt;JS 脚本生成器&lt;br&gt;并发 · 背压 · 限速" vertex="1">
+          <mxGeometry height="112" width="112" x="520" y="145" as="geometry"/>
+        </mxCell>
+        <mxCell id="16" value="&lt;b&gt;audit&lt;/b&gt;&lt;br&gt;摘要 + 命中快照&lt;br&gt;双阶段落库&lt;br&gt;会话聚合" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;verticalAlign=top;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="644" y="145" width="112" height="112" as="geometry"/></mxCell>
+        <mxCell id="21" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="YAML + DPAPI" vertex="1">
+          <mxGeometry height="44" width="112" x="24" y="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="franz-go (kgo)" vertex="1">
+          <mxGeometry height="44" width="112" x="148" y="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="kgo 直连分区" vertex="1">
+          <mxGeometry height="44" width="112" x="272" y="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="gojq（沙箱）" vertex="1">
+          <mxGeometry height="44" width="112" x="396" y="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="goja + kgo" vertex="1">
+          <mxGeometry height="44" width="112" x="520" y="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="26" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="SQLite" vertex="1">
+          <mxGeometry height="44" width="112" x="644" y="300" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.0765;exitY=1;entryX=0.5;entryY=0;html=1;" target="11">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.246;exitY=1;entryX=0.5;entryY=0;html=1;" target="12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.415;exitY=1;entryX=0.5;entryY=0;html=1;" target="13">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.585;exitY=1;entryX=0.5;entryY=0;html=1;" target="14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.754;exitY=1;entryX=0.5;entryY=0;html=1;" target="15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=0.923;exitY=1;entryX=0.5;entryY=0;html=1;" target="16">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;html=1;" target="21">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" edge="1" parent="1" source="12" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;html=1;" target="22">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;html=1;" target="23">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" edge="1" parent="1" source="14" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;html=1;" target="24">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="40" edge="1" parent="1" source="15" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;html=1;" target="25">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="41" edge="1" parent="1" source="16" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=none;html=1;" target="26">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="50" parent="1" style="rounded=1;fillColor=#fffde7;strokeColor=#b59d00;dashed=1;fontSize=11;align=left;verticalAlign=top;spacingLeft=10;spacingTop=6;whiteSpace=wrap;html=1;" value="&lt;b&gt;依赖方向&lt;/b&gt;：cmd/kp → internal/app → internal/{config,kafka,scan,filter,produce,audit} → 第三方库&lt;br&gt;&lt;b&gt;约束&lt;/b&gt;：内核不反向依赖接口层；app 只做用例编排与审计埋点，不做协议解析；模块之间只经由 app 组合，禁止隐式全局单例" vertex="1">
+          <mxGeometry height="72" width="732" x="24" y="375" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="45is43t4-vm59" name="3-查询链路时序">
+    <mxGraphModel dx="2186" dy="1093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" parent="1" style="text;fontSize=18;fontStyle=1;align=left;whiteSpace=wrap;html=1;" value="查询链路时序（kp scan）" vertex="1">
+          <mxGeometry height="30" width="360" x="24" y="8" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;whiteSpace=wrap;html=1;" value="AI / 人类" vertex="1">
+          <mxGeometry height="44" width="104" x="28" y="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;whiteSpace=wrap;html=1;" value="CLI　kp" vertex="1">
+          <mxGeometry height="44" width="104" x="148" y="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;whiteSpace=wrap;html=1;" value="app（用例）" vertex="1">
+          <mxGeometry height="44" width="104" x="268" y="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;whiteSpace=wrap;html=1;" value="scan 扫描引擎" vertex="1">
+          <mxGeometry height="44" width="104" x="388" y="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;whiteSpace=wrap;html=1;" value="filter 过滤器" vertex="1">
+          <mxGeometry height="44" width="104" x="508" y="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="15" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;whiteSpace=wrap;html=1;" value="Kafka 集群" vertex="1">
+          <mxGeometry height="44" width="104" x="628" y="52" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" parent="1" style="fillColor=none;strokeColor=#b0b0b0;dashed=1;whiteSpace=wrap;html=1;" vertex="1">
+          <mxGeometry height="414" width="1" x="79" y="96" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" parent="1" style="fillColor=none;strokeColor=#b0b0b0;dashed=1;whiteSpace=wrap;html=1;" vertex="1">
+          <mxGeometry height="414" width="1" x="199" y="96" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" parent="1" style="fillColor=none;strokeColor=#b0b0b0;dashed=1;whiteSpace=wrap;html=1;" vertex="1">
+          <mxGeometry height="414" width="1" x="319" y="96" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" parent="1" style="fillColor=none;strokeColor=#b0b0b0;dashed=1;whiteSpace=wrap;html=1;" vertex="1">
+          <mxGeometry height="414" width="1" x="439" y="96" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" parent="1" style="fillColor=none;strokeColor=#b0b0b0;dashed=1;whiteSpace=wrap;html=1;" vertex="1">
+          <mxGeometry height="414" width="1" x="559" y="96" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" parent="1" style="fillColor=none;strokeColor=#b0b0b0;dashed=1;whiteSpace=wrap;html=1;" vertex="1">
+          <mxGeometry height="414" width="1" x="679" y="96" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" edge="1" parent="1" source="20" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.106;entryX=0;entryY=0.106;html=1;" target="21" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" edge="1" parent="1" source="21" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.193;entryX=0;entryY=0.193;html=1;" target="22" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" edge="1" parent="1" source="22" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.28;entryX=0;entryY=0.28;html=1;" target="23" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" edge="1" parent="1" source="23" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.367;entryX=0;entryY=0.367;html=1;" target="25" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" edge="1" parent="1" source="25" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.454;entryX=1;entryY=0.454;dashed=1;html=1;" target="23" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" edge="1" parent="1" source="23" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.541;entryX=0;entryY=0.541;html=1;" target="25" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" edge="1" parent="1" source="23" style="edgeStyle=orthogonalEdgeStyle;exitX=0.75;exitY=0.628;entryX=0.25;entryY=0.628;html=1;" target="24" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" edge="1" parent="1" source="24" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.715;entryX=1;entryY=0.715;dashed=1;html=1;" target="23" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" edge="1" parent="1" source="23" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.802;entryX=1;entryY=0.802;dashed=1;html=1;" target="22" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" edge="1" parent="1" source="22" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.889;entryX=1;entryY=0.889;dashed=1;html=1;" target="21" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="40" edge="1" parent="1" source="21" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.976;entryX=1;entryY=0.976;dashed=1;html=1;" target="20" value="">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="50" parent="1" style="rounded=1;fillColor=#fffde7;strokeColor=#b59d00;dashed=1;fontSize=11;align=left;verticalAlign=middle;spacingLeft=10;whiteSpace=wrap;html=1;" value="&lt;b&gt;贯穿约定&lt;/b&gt;：一次命令 = 一个 op_id，从 audit.Begin 到 audit.Finish 全程携带；截断标记、性能告警、耗时与错误一并落库。AI 与人类走同一路径、同一审计字段。" vertex="1">
+          <mxGeometry height="48" width="752" x="24" y="528" as="geometry"/>
+        </mxCell>
+        <mxCell id="l30" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="kp scan --topic orders --key A1001 --last 100" vertex="1">
+          <mxGeometry height="16" width="260" x="10" y="118" as="geometry"/>
+        </mxCell>
+        <mxCell id="l31" value="ScanRequest（--last ≤ 5000，超 1000 附性能告警）" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="119" y="154" width="280" height="16" as="geometry"/></mxCell>
+        <mxCell id="l32" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="Run(req) + audit.Begin(op_id)" vertex="1">
+          <mxGeometry height="16" width="220" x="269" y="190" as="geometry"/>
+        </mxCell>
+        <mxCell id="l33" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="Metadata + ListOffsets 定位起始 offset" vertex="1">
+          <mxGeometry height="16" width="280" x="419" y="226" as="geometry"/>
+        </mxCell>
+        <mxCell id="l34" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="分区 → [start, end] 区间" vertex="1">
+          <mxGeometry height="16" width="200" x="459" y="262" as="geometry"/>
+        </mxCell>
+        <mxCell id="l35" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="Fetch：每分区独立 reader · direct assign · 不提交 offset" vertex="1">
+          <mxGeometry height="16" width="300" x="409" y="298" as="geometry"/>
+        </mxCell>
+        <mxCell id="l36" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="record（key / value / headers / ts）" vertex="1">
+          <mxGeometry height="16" width="240" x="379" y="334" as="geometry"/>
+        </mxCell>
+        <mxCell id="l37" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="matched record" vertex="1">
+          <mxGeometry height="16" width="140" x="429" y="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="l38" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="ScanResult（total / matched / truncated / elapsed）" vertex="1">
+          <mxGeometry height="16" width="280" x="239" y="406" as="geometry"/>
+        </mxCell>
+        <mxCell id="l39" value="结果 + audit.Finish（最终结果 + 命中快照）" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="119" y="442" width="280" height="16" as="geometry"/></mxCell>
+        <mxCell id="l40" parent="1" style="rounded=0;fillColor=#ffffff;strokeColor=none;fontSize=11;align=center;verticalAlign=middle;whiteSpace=wrap;html=1;" value="stdout JSON + 退出码" vertex="1">
+          <mxGeometry height="16" width="180" x="50" y="478" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="9p5rq0du-sj0a" name="4-注入管道与背压">
+    <mxGraphModel dx="2186" dy="1093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" parent="1" style="text;fontSize=18;fontStyle=1;align=left;whiteSpace=wrap;html=1;" value="批量注入管道（背压 · 限速 · 可中断）" vertex="1">
+          <mxGeometry height="30" width="420" x="24" y="8" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;whiteSpace=wrap;html=1;" value="输入源&lt;br&gt;单条参数 / JS 脚本" vertex="1">
+          <mxGeometry height="64" width="120" x="30" y="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;whiteSpace=wrap;html=1;" value="生成器&lt;br&gt;执行 generate(ctx)" vertex="1">
+          <mxGeometry height="64" width="120" x="180" y="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;whiteSpace=wrap;html=1;" value="有界队列&lt;br&gt;cap = 1024" vertex="1">
+          <mxGeometry height="64" width="120" x="330" y="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;whiteSpace=wrap;html=1;" value="Worker 池&lt;br&gt;并发 8（可调）" vertex="1">
+          <mxGeometry height="64" width="120" x="480" y="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="14" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;whiteSpace=wrap;html=1;" value="Kafka Producer&lt;br&gt;key hash / 指定分区" vertex="1">
+          <mxGeometry height="64" width="130" x="630" y="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="20" parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;whiteSpace=wrap;html=1;" value="中断控制&lt;br&gt;ctx 取消 · 优雅停止" vertex="1">
+          <mxGeometry height="64" width="120" x="30" y="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;whiteSpace=wrap;html=1;" value="脚本沙箱&lt;br&gt;goja · 禁 IO · 超时" vertex="1">
+          <mxGeometry height="64" width="120" x="180" y="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;whiteSpace=wrap;html=1;" value="令牌桶限速&lt;br&gt;rate/s · 并发上限" vertex="1">
+          <mxGeometry height="64" width="120" x="480" y="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" parent="1" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;whiteSpace=wrap;html=1;" value="审计采集&lt;br&gt;仅最终结果统计" vertex="1">
+          <mxGeometry height="64" width="130" x="630" y="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="24" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;whiteSpace=wrap;html=1;" value="进度聚合器&lt;br&gt;每 500 条 / 500ms" vertex="1">
+          <mxGeometry height="64" width="160" x="450" y="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="25" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;whiteSpace=wrap;html=1;" value="输出&lt;br&gt;CLI stderr / SSE" vertex="1">
+          <mxGeometry height="64" width="130" x="650" y="370" as="geometry"/>
+        </mxCell>
+        <mxCell id="30" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.5;html=1;" target="11">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.5;html=1;" target="12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" edge="1" parent="1" source="12" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.5;labelBackgroundColor=#ffffff;fontSize=10;html=1;" target="13" value="背压">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="33" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.5;html=1;" target="14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" edge="1" parent="1" source="20" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;labelBackgroundColor=#ffffff;fontSize=10;dashed=1;html=1;" target="10" value="取消信号">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="35" edge="1" parent="1" source="21" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;dashed=1;html=1;" target="11">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" edge="1" parent="1" source="22" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;dashed=1;html=1;" target="13">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" edge="1" parent="1" source="23" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5;entryY=0;dashed=1;html=1;" target="14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;exitX=0.5;exitY=1;entryX=0.5625;entryY=0;labelBackgroundColor=#ffffff;fontSize=10;dashed=1;html=1;" target="24" value="上报">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" edge="1" parent="1" source="24" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.5;html=1;" target="25">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="50" parent="1" style="rounded=1;fillColor=#fffde7;strokeColor=#b59d00;dashed=1;fontSize=11;align=left;verticalAlign=middle;spacingLeft=10;whiteSpace=wrap;html=1;" value="&lt;b&gt;为什么这么设计&lt;/b&gt;：队列有界 → 内存不随总条数增长（1 万与 50 万都是同一个内存峰值）；生成器与发送解耦 → 脚本写得慢不会拖垮 broker，发送慢会自动反压生成器；取消只停新任务，已确认写入的条目不回滚，结果如实回报已写入数。" vertex="1">
+          <mxGeometry height="70" width="750" x="30" y="460" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="hrp7utpz-gb1f" name="5-审计与只读回放">
+    <mxGraphModel dx="2186" dy="1093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="2" parent="1" style="text;fontSize=18;fontStyle=1;align=left;whiteSpace=wrap;html=1;" value="AI 操作留痕与客户端只读回放" vertex="1">
+          <mxGeometry height="30" width="420" x="24" y="8" as="geometry"/>
+        </mxCell>
+        <mxCell id="10" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;whiteSpace=wrap;html=1;" value="AI：kp 命令调用" vertex="1">
+          <mxGeometry height="50" width="140" x="30" y="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="11" parent="1" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;whiteSpace=wrap;html=1;" value="人类：客户端操作" vertex="1">
+          <mxGeometry height="50" width="140" x="30" y="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="12" parent="1" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;whiteSpace=wrap;html=1;" value="app 用例层&lt;br&gt;audit.Record（source 区分 AI / 人类）" vertex="1">
+          <mxGeometry height="110" width="180" x="220" y="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="13" value="SQLite（audit.db）&lt;br&gt;operations 摘要 + 命中快照" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="450" y="85" width="150" height="50" as="geometry"/></mxCell>
+        <mxCell id="15" value="server&lt;br&gt;/api/audit/* + SSE&lt;br&gt;（轮询 WAL 推送）" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="650" y="50" width="130" height="110" as="geometry"/></mxCell>
+        <mxCell id="20" parent="1" style="rounded=1;fillColor=#ffcccc;strokeColor=#b85450;fontSize=11;fontStyle=1;whiteSpace=wrap;html=1;" value="客户端观测区（只读）&lt;br&gt;AI 会话时间线 · 操作列表 · 实时流入" vertex="1">
+          <mxGeometry height="64" width="220" x="560" y="215" as="geometry"/>
+        </mxCell>
+        <mxCell id="21" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="会话时间线&lt;br&gt;一轮任务的多步操作" vertex="1">
+          <mxGeometry height="56" width="220" x="30" y="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="22" parent="1" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" value="操作详情&lt;br&gt;命令 · 参数 · 结果统计 · 状态" vertex="1">
+          <mxGeometry height="56" width="220" x="280" y="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="23" value="快照重放&lt;br&gt;读命中快照纯本地展示，不碰 Kafka" style="rounded=1;fillColor=#f5f5f5;strokeColor=#999999;fontSize=11;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="530" y="320" width="220" height="56" as="geometry"/></mxCell>
+        <mxCell id="30" edge="1" parent="1" source="10" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.27;html=1;" target="12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="31" edge="1" parent="1" source="11" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.95;html=1;" target="12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="32" edge="1" parent="1" source="12" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.545;entryX=0;entryY=0.5;html=1;" target="13">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="34" edge="1" parent="1" source="13" style="edgeStyle=orthogonalEdgeStyle;exitX=1;exitY=0.5;entryX=0;entryY=0.545;html=1;" target="15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="36" edge="1" parent="1" source="15" style="edgeStyle=orthogonalEdgeStyle;exitX=0.8;exitY=1;entryX=0.8;entryY=0;html=1;" target="20">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="37" edge="1" parent="1" source="20" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.4;entryX=0.5;entryY=0;html=1;" target="21">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="38" edge="1" parent="1" source="20" style="edgeStyle=orthogonalEdgeStyle;exitX=0;exitY=0.7;entryX=0.5;entryY=0;html=1;" target="22">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="39" edge="1" parent="1" source="20" style="edgeStyle=orthogonalEdgeStyle;exitX=0.65;exitY=1;entryX=0.77;entryY=0;html=1;" target="23">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="50" value="&lt;b&gt;只读约束&lt;/b&gt;：观测区仅能调用 GET /api/audit/* 与 SSE 订阅，服务端不暴露写接口；CLI 与客户端均无认证鉴权（本地工具），Kafka 凭证（SASL / TLS）仅由内核 config 持有。&lt;br&gt;&lt;b&gt;审计原则&lt;/b&gt;：operations 行只存最终结果（统计 / 状态 / 错误）、不含消息体；scan 命中内容落有界快照（≤100 条 / 1MB）；核对内容用「快照重放」纯本地读取，不发起 Kafka 读写。摘要与快照合计保留 30 天或 500MB。" style="rounded=1;fillColor=#fffde7;strokeColor=#b59d00;dashed=1;fontSize=11;align=left;verticalAlign=middle;spacingLeft=10;whiteSpace=wrap;html=1;" vertex="1" parent="1"><mxGeometry x="30" y="410" width="750" height="80" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

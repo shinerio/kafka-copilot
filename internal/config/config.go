@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -41,16 +40,17 @@ type Config struct {
 
 // Manager handles profile CRUD and persistence.
 type Manager struct {
-	mu       sync.RWMutex
-	path     string
-	config   *Config
+	mu     sync.RWMutex
+	path   string
+	config *Config
 }
 
-// NewManager creates a config manager using the default app data path.
+// NewManager creates a config manager using the resolved data directory
+// (configurable; defaults to kp-data next to the executable).
 func NewManager() (*Manager, error) {
-	dir := AppDataDir()
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create app data dir: %w", err)
+	dir, err := DataDir()
+	if err != nil {
+		return nil, err
 	}
 	path := filepath.Join(dir, "config.yaml")
 	m := &Manager{path: path}
@@ -67,21 +67,6 @@ func NewManagerWithPath(path string) (*Manager, error) {
 		return nil, err
 	}
 	return m, nil
-}
-
-// AppDataDir returns the app data directory path.
-func AppDataDir() string {
-	if v := os.Getenv("KP_APPDATA"); v != "" {
-		return v
-	}
-	if runtime.GOOS == "windows" {
-		base := os.Getenv("APPDATA")
-		if base == "" {
-			base = filepath.Join(os.Getenv("USERPROFILE"), "AppData", "Roaming")
-		}
-		return filepath.Join(base, "kafka-pilot")
-	}
-	return filepath.Join(os.Getenv("HOME"), ".kafka-pilot")
 }
 
 func (m *Manager) load() error {
@@ -297,7 +282,6 @@ func ParseBootstrapServers(s string) []string {
 	}
 	return result
 }
-
 
 // randomHex generates a random hex string of the given byte length.
 func randomHex(n int) (string, error) {

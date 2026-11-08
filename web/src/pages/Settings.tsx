@@ -1,5 +1,5 @@
-// Settings page (FR-13 + audit retention): profile CRUD with SASL/TLS fields
-// and audit data clear (before a given timestamp).
+// Settings page (FR-13 + FR-16): profile CRUD with SASL/TLS fields,
+// configurable data directory (kp-data) and audit retention.
 
 import {
   Title3,
@@ -32,7 +32,7 @@ import {
 } from '@fluentui/react-icons'
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
-import type { Profile, ProfileInput, SASL, TLS } from '../types'
+import type { Profile, ProfileInput, SASL, TLS, SettingsInfo } from '../types'
 import { EmptyState, ErrorState, JsonView } from '../components/ui'
 import { SelectBox } from '../components/controls'
 
@@ -132,6 +132,86 @@ export function SettingsPage({
   const [auditBefore, setAuditBefore] = useState('')
   const [auditMsg, setAuditMsg] = useState<string | null>(null)
   const [auditError, setAuditError] = useState<unknown>(null)
+
+  // --- Configurable data directory (kp-data) ---
+  const [layout, setLayout] = useState<SettingsInfo | null>(null)
+  const [dirInput, setDirInput] = useState('')
+  const [copyCurrent, setCopyCurrent] = useState(true)
+  const [dirBusy, setDirBusy] = useState(false)
+  const [dirMsg, setDirMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+  const [dirError, setDirError] = useState<unknown>(null)
+
+  const loadLayout = useCallback(async () => {
+    try {
+      const info = await api.getSettings()
+      setLayout(info)
+      setDirInput(info.data_dir)
+      setDirError(null)
+    } catch (e) {
+      setDirError(e)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadLayout()
+  }, [loadLayout])
+
+  useEffect(() => {
+    if (dirMsg) {
+      const t = window.setTimeout(() => setDirMsg(null), 6000)
+      return () => window.clearTimeout(t)
+    }
+  }, [dirMsg])
+
+  const saveDataDir = useCallback(async () => {
+    const value = dirInput.trim()
+    if (!value) {
+      setDirMsg({ kind: 'error', text: '数据目录不能为空' })
+      return
+    }
+    setDirBusy(true)
+    setDirMsg(null)
+    try {
+      const res = await api.updateSettings({ data_dir: value, copy_current: copyCurrent })
+      const moved = res.copied.length
+        ? `已复制 ${res.copied.join('、')}`
+        : res.skipped.length
+          ? `目标已存在 ${res.skipped.join('、')}（未覆盖）`
+          : '没有可复制的数据'
+      setDirMsg({
+        kind: 'ok',
+        text: `${res.status === 'unchanged' ? '目录未变化' : `已写入 ${res.settings_path}`}，${moved}。请执行 kp restart 后生效。`,
+      })
+      await loadLayout()
+    } catch (e) {
+      setDirMsg({ kind: 'error', text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setDirBusy(false)
+    }
+  }, [dirInput, copyCurrent, loadLayout])
+
+  const migrateData = useCallback(async () => {
+    setDirBusy(true)
+    setDirMsg(null)
+    try {
+      const res = await api.migrateSettings(false)
+      if (res.already_done) {
+        setDirMsg({ kind: 'ok', text: `无需重复迁移：${res.note || '已完成一次性迁移'}` })
+      } else if (res.copied.length === 0) {
+        setDirMsg({ kind: 'ok', text: '旧目录没有可迁移的数据，或目标已存在同名文件（未覆盖）。' })
+      } else {
+        setDirMsg({
+          kind: 'ok',
+          text: `已从 ${res.source} 迁移 ${res.copied.join('、')} 到 ${res.dest}；原文件保留以便回滚，重启服务后生效。`,
+        })
+      }
+      await loadLayout()
+    } catch (e) {
+      setDirMsg({ kind: 'error', text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setDirBusy(false)
+    }
+  }, [loadLayout])
 
   useEffect(() => {
     if (msg) {
@@ -238,8 +318,112 @@ export function SettingsPage({
     setForm((prev) => ({ ...prev, [k]: v }))
 
   return (
-    <div className="kp-fill" style={{ gap: 12 }}>
+    <div className="kp-fill kp-fill--settings" style={{ gap: 12 }}>
       <Title3>设置</Title3>
+
+      {/* Configurable data directory */}
+      <Card className="kp-card">
+        <div className="kp-row" style={{ justifyContent: 'space-between' }}>
+          <Subtitle2>数据目录（Profile / 审计 / 缓存）</Subtitle2>
+          {layout?.pending_change && (
+            <span className="kp-pill kp-pill--running" style={{ marginLeft: 8 }}>
+              待重启生效
+            </span>
+          )}
+        </div>
+        <Body1 className="kp-muted" style={{ marginTop: 4 }}>
+          默认是 kp.exe 同目录的 kp-data；设置文件 kp-settings.yaml 固定放在 kp.exe 旁。
+          修改数据目录后需执行 kp restart 才会切换。
+        </Body1>
+
+        {layout && (
+          <div className="kp-path-grid">
+            <span className="kp-muted">设置文件</span>
+            <span className="kp-cell-mono">{layout.settings_path}</span>
+            <span className="kp-muted">当前生效</span>
+            <span className="kp-cell-mono">{layout.active_data_dir || layout.data_dir}</span>
+            <span className="kp-muted">配置目录</span>
+            <span className="kp-cell-mono">{layout.data_dir}</span>
+            <span className="kp-muted">默认目录</span>
+            <span className="kp-cell-mono">{layout.default_data_dir}</span>
+            <span className="kp-muted">旧版目录</span>
+            <span className="kp-cell-mono">
+              {layout.legacy_dir}
+              {layout.legacy_config_exists || layout.legacy_audit_exists ? '（仍有数据）' : '（无数据）'}
+            </span>
+            <span className="kp-muted">Profile 文件</span>
+            <span className="kp-cell-mono">
+              {layout.config_path}{layout.config_exists ? '' : '（不存在）'}
+            </span>
+            <span className="kp-muted">审计库</span>
+            <span className="kp-cell-mono">
+              {layout.audit_path}{layout.audit_exists ? '' : '（不存在）'}
+            </span>
+            <span className="kp-muted">迁移状态</span>
+            <span className="kp-cell-mono">
+              {layout.migration_done ? `已完成（${layout.migrated_at || '时间未记录'}）` : '尚未迁移'}
+              {layout.env_override ? ` · KP_APPDATA=${layout.env_override}` : ''}
+            </span>
+          </div>
+        )}
+        {Boolean(dirError) && <ErrorState error={dirError} />}
+
+        <div style={{ marginTop: 12 }}>
+          <Field label="数据目录（相对路径基于 kp.exe 所在目录）">
+            <Input
+              value={dirInput}
+              onChange={(_, d) => setDirInput(d.value)}
+              placeholder="kp-data"
+            />
+          </Field>
+        </div>
+        <div className="kp-row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+          <Switch
+            checked={copyCurrent}
+            onChange={(_, d) => setCopyCurrent(d.checked)}
+            label="同时复制现有数据"
+          />
+          <Button
+            appearance="primary"
+            icon={<SaveRegular />}
+            onClick={saveDataDir}
+            disabled={dirBusy}
+          >
+            保存目录
+          </Button>
+          <Button
+            appearance="subtle"
+            onClick={() => layout && setDirInput(layout.default_data_dir)}
+            disabled={dirBusy}
+          >
+            恢复默认值
+          </Button>
+          <Button
+            appearance="subtle"
+            icon={<EraserRegular />}
+            onClick={migrateData}
+            disabled={dirBusy}
+          >
+            从旧位置迁移
+          </Button>
+          {dirBusy && <span className="kp-spinner" />}
+        </div>
+        <Body1 className="kp-muted" style={{ marginTop: 8 }}>
+          切换目录前建议先 kp stop，避免审计库 WAL 复制时少掉最后几条记录；源文件始终保留、绝不删除或覆盖。
+          旧版目录的一次性迁移只执行一次。
+        </Body1>
+        {dirMsg && (
+          <MessageBar
+            intent={dirMsg.kind === 'ok' ? 'success' : 'error'}
+            style={{ marginTop: 8 }}
+          >
+            <MessageBarBody>
+              <MessageBarTitle>{dirMsg.kind === 'ok' ? '成功' : '失败'}</MessageBarTitle>
+              {dirMsg.text}
+            </MessageBarBody>
+          </MessageBar>
+        )}
+      </Card>
 
       {/* Profile list */}
       <Card className="kp-card">

@@ -34,7 +34,7 @@ Kafka Pilot（`kp`）是一个**单二进制**的 Kafka 数据工具：查数、
 
 | 包 | 职责 | 关键文件 |
 |---|---|---|
-| `config` | profile 增删改查、路径解析（`%APPDATA%/kafka-pilot`）、凭据加解密（Windows DPAPI）；**Kafka 凭证仅在此模块内解密** | `config.go`、`dpapi_windows.go` / `dpapi_other.go` |
+| `config` | profile 增删改查；**数据目录解析与迁移**（默认 `kp.exe` 同目录 `kp-data`，`kp-settings.yaml` 可配置、`KP_APPDATA` 覆盖，一次性从旧 `%APPDATA%` 迁移）；凭据加解密（Windows DPAPI）；**Kafka 凭证仅在此模块内解密** | `config.go`、`settings.go`（含 `settings_test.go`）、`dpapi_windows.go` / `dpapi_other.go` |
 | `kafka` | 连接池（按 profile 缓存 `kgo.Client`，支持 SASL / 单向 TLS 组合、多 broker 发现）、元数据、offset 定位、lag 计算；`KeyPartition` 用 murmur2 复刻默认分区器 | `client.go`、`keypartition.go`（含单测） |
 | `scan` | 分区并行读取（direct assign）、时间 / 条数边界计算、跨分区归并排序、截断判定、快照边界 | `scanner.go` |
 | `filter` | 三层过滤：key → keyword → jq 表达式；`Decoder` 插件接口（内置 `text` / `json`） | `filter.go`、`keyword.go` |
@@ -43,10 +43,10 @@ Kafka Pilot（`kp`）是一个**单二进制**的 Kafka 数据工具：查数、
 
 ### 2.2 CLI 接入层 `cmd/kp/`
 
-- `main.go`：cobra 根命令、全局 flag（`--profile` / `--session` / `--intent` / `--format`）、退出码分类、JSON 输出。
-- `serve.go` / `service.go`：服务生命周期（`serve` / `desktop` / `stop` / `restart`），PID 文件管理。
+- `main.go`：cobra 根命令、全局 flag（`--profile` / `--session` / `--intent` / `--format`）、退出码分类、JSON 输出；含 `kp settings`（数据目录管理）。
+- `serve.go` / `service.go`：服务生命周期（`serve` / `desktop` / `stop` / `restart`），PID 文件管理（`kp.pid` 放 exe 同目录，兼容查找旧位置）。
 
-每个命令只做三件事：**解析参数 → 组装 `app.*Request` → 调 `internal/app` 方法 → 输出 JSON**。任何业务逻辑都不得在 CLI 层实现。
+每个命令只做三件事：**解析参数 → 组装 `app.*Request` → 调 `internal/app` 方法 → 输出 JSON**。任何业务逻辑都不得在 CLI 层实现。例外：`settings` / `stop` / `restart` 是纯本地管理命令，直接调 `internal/config`（不经 `app`、不写审计、不连 Kafka），以 `PersistentPreRunE` no-op 跳过 `app.New()`。
 
 ### 2.3 前端 UI `web/`
 
@@ -59,7 +59,7 @@ React 19 + TypeScript + Vite + **Fluent UI React v9**。页面（`web/src/pages/
 | `Produce.tsx` | 单条 / 脚本批量注入（粘贴式 JS 编辑器 + dry-run + 进度） |
 | `Groups.tsx` | consumer group lag 只读观测 |
 | `Observe.tsx` | AI 操作审计（只读：会话 → 时间线 → op 详情 + 快照重放） |
-| `Settings.tsx` | profile 管理（含 SASL / TLS 表单）、保留策略、外观 |
+| `Settings.tsx` | **数据目录卡**（查看 / 修改 / 复制 / 一次性迁移 / 重启提示）、profile 管理（含 SASL / TLS 表单）、保留策略、外观 |
 
 前端所有数据均来自 `web/src/api.ts` 调用的本地 REST/SSE 端点（见 §3）。
 
@@ -73,9 +73,13 @@ kafka-pilot/
 │   ├── main.go             #   cobra 根、全局 flag、退出码、JSON 输出
 │   ├── serve.go            #   serve / desktop 启动
 │   └── service.go         #   stop / restart + PID 文件
+├── kp.exe                  # 单二进制（构建产物）
+├── kp-settings.yaml        # 固定：data_dir / 迁移标记（运行后生成，不进版本库）
+├── kp.pid                  # 固定：服务 PID + 端口（运行后生成）
+├── kp-data/                # 默认数据目录（运行后生成）：config.yaml / audit.db / cache.db
 ├── internal/
 │   ├── app/app.go          # 用例层（Scan/Produce/Inspect/Audit/Session/Profile）+ 审计埋点
-│   ├── config/             # profile 与凭据
+│   ├── config/             # profile、凭据、数据目录（settings.go）与一次性迁移
 │   ├── kafka/              # 连接池、元数据、分区哈希
 │   ├── scan/               # 扫描与归并
 │   ├── filter/             # 三层过滤 + Decoder 接口
@@ -91,7 +95,6 @@ kafka-pilot/
 │   └── package.json
 ├── docs/                   # 技术文档（设计文档 + 架构图 PNG/drawio）
 ├── skill/SKILL.md          # AI Agent 使用 kp 的契约（必须随能力同步更新）
-├── test-data/              # 本地测试用 appdata（KP_APPDATA 指向这里）
 └── README.md               # 用户手册（命令参考）
 ```
 
@@ -109,6 +112,9 @@ GET  /api/sessions[/{id}]  DELETE /api/sessions  # 浏览 / 详情 / 批量删�
 GET  /api/audit/ops[/{op_id}][/snapshot]  DELETE /api/audit/ops  DELETE /api/audit
 GET  /api/audit/stream                         # SSE 实时推送
 GET  /api/schema                               # 机器可读：命令清单 + 退出码（对应 CLI 的 kp schema）
+GET  /api/settings                             # 数据目录布局（与 kp settings show 同结构 + active_data_dir / pending_change）
+PUT  /api/settings                             # 改数据目录（body: data_dir / copy_current，默认复制现有数据）
+POST /api/settings/migrate                     # 一次性从旧 %APPDATA% 迁移（body: force，可选）
 ```
 
 ---
@@ -150,21 +156,26 @@ cd web && npm run dev     # Vite dev server，改动即时生效，走内存、�
 ### 4.4 运行 / 调试
 
 ```bash
-# 用独立目录做测试，避免污染正式配置
-export KP_APPDATA=D:/workspace/proj/kafka-pilot/test-data
+# 默认数据目录就是 kp.exe 同目录的 kp-data/，通常无需任何环境变量
+kp settings show          # 查看当前布局与迁移状态
+
+# 用独立目录做测试（覆盖 kp-settings.yaml 的配置，且不触发旧目录迁移）
+export KP_APPDATA=D:/workspace/proj/kafka-pilot/tmp-test-data   # 任意临时目录，按需创建
 
 kp serve --port 18080     # 启动服务，浏览器开 http://127.0.0.1:18080
 kp desktop                # 自动端口 + 自动开浏览器
-kp restart                # 改了手改的 config.yaml 后重载（API/UI 保存是即时生效，无需重启）
+kp restart                # 手改 config.yaml / 改数据目录 / 完成迁移后重载（API/UI 保存 profile 即时生效）
 kp stop                   # 停服务
 ```
+
+> 数据目录：`kp-settings.yaml` 固定放 exe 旁；改目录后需 `kp restart`；一次性迁移由 `config.DataDir()` 自动完成（或显式 `kp settings migrate`），源文件保留不删除。详见 `README.md` §2 与设计文档 FR-16。
 
 > ⚠️ `kp serve` 是**前台常驻进程**。在普通交互式 shell 用 `./kp serve &` 起，shell 退出进程会被回收，表现为「服务莫名其妙没了」。长期运行请用后台任务机制拉起。
 
 ### 4.5 测试
 
 ```bash
-go test ./internal/...                 # 内核单测；keypartition_test.go 是范例（murmur2 与 franz-go 落点逐条比对）
+go test ./internal/...                 # 内核单测；keypartition_test.go（murmur2 落点）、config/settings_test.go（数据目录 / 迁移 / SQLite 整组复制）
 cd web && npm run lint                 # oxlint 前端静态检查
 ```
 
@@ -183,7 +194,12 @@ cd web && npm run lint                 # oxlint 前端静态检查
 9. **明确「CLI 专属」能力，不算双端缺口**：以下能力刻意只走 CLI，不进 REST / Web UI，**不要为了「一致」而补 REST 端点**，也不要在 Web UI 加对应入口：
    - 会话的「新建 / 结束」（`kp session new` / `kp session end`）—— 供 AI Agent 在任务开始前开会话、结束时收尾，人类在 Web 观测区无需此操作。
    - 服务生命周期（`kp serve` / `desktop` / `stop` / `restart`）—— 进程管理，REST 服务本身就是被管理对象。
-   - 其余能力（profile / topic / group / scan / produce / audit / key-partition 等）必须 **CLI 与 REST 完全对称**：任一侧有的能力，另一侧也要有。
+   - 其余能力（profile / topic / group / scan / produce / audit / key-partition / settings 等）必须 **CLI 与 REST 完全对称**：任一侧有的能力，另一侧也要有。
+10. **数据目录与 PID 文件（FR-16）**：
+    - 数据目录默认 `<exe 目录>/kp-data`，由 `kp-settings.yaml` 的 `data_dir` 配置（相对路径基于 exe 目录），`KP_APPDATA` 仅作测试覆盖；`kp-settings.yaml` 与 `kp.pid` 固定放 exe 旁，**不要放进数据目录**。
+    - 迁移 / 切换目录必须走 `internal/config` 的 `MigrateData` / `SetDataDir` / `CopyDataDir`：只复制、不删除、不覆盖，`audit.db` + `-wal` + `-shm` 整组处理；`migration_done` 保证一次性。
+    - 服务只在启动时解析目录，改目录 / 迁移后必须 `kp restart`；`GET /api/settings` 用 `active_data_dir` / `pending_change` 区分生效值与配置值。
+    - `settings` 命令与端点是纯本地文件管理，**不写审计埋点**（不经 `NewOpContext` / `FinishOp`），但仍须 CLI + REST 对称。
 
 ---
 
@@ -228,3 +244,5 @@ cd web && npm run lint                 # oxlint 前端静态检查
 | 脚本里 `console.log` 报未定义 | goja 沙箱未注入 `console` | 用 `kp produce --dry-run` 看前 5 条样例 |
 | 扫描结果被「截断」 | 实为 12 分区 × 100 = 1200 条检查、命中 100，并非截断 | 设计文档 FR-05 统计语义 |
 | 多 broker / TLS 连通性问题 | mechanism 与服务端不一致，或 SASL_SSL 漏配 `--tls` | 设计文档 FR-13 + README §4 FAQ |
+| 改了数据目录但 / 审计记录「不见了」 | 服务只在启动时解析一次目录，未重启；或 `KP_APPDATA` 指向了别的目录 | `kp settings show` 看 `active_data_dir` / `data_dir` / `env_override`，再 `kp restart` |
+| 迁移后 audit.db 打不开 / 内容异常 | `audit.db-wal` / `-shm` 没和 `audit.db` 整组复制，混入了不匹配的 WAL | 只走 `config.MigrateData` / `CopyDataDir`；先 `kp stop`，必要时 `kp settings migrate --force` 复查 |

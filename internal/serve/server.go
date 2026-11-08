@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -90,6 +91,11 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/audit/ops/{op_id}/snapshot", s.handleGetSnapshot)
 	s.mux.HandleFunc("GET /api/audit/stream", s.handleAuditStream)
 	s.mux.HandleFunc("DELETE /api/audit", s.handleClearAudit)
+
+	// Settings (configurable data directory)
+	s.mux.HandleFunc("GET /api/settings", s.handleGetSettings)
+	s.mux.HandleFunc("PUT /api/settings", s.handlePutSettings)
+	s.mux.HandleFunc("POST /api/settings/migrate", s.handleMigrateSettings)
 
 	// Static files / SPA fallback (catch-all for GET)
 	s.mux.HandleFunc("GET /", s.handleStatic)
@@ -214,20 +220,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 // handleSchema mirrors `kp schema`: machine-readable command list + exit codes,
 // so REST clients (and agents) can discover capabilities without hardcoding them.
 func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"commands": []string{
-			"profile", "topic", "group", "scan", "produce",
-			"session", "audit", "schema", "key-partition",
-			"serve", "desktop", "stop", "restart",
-		},
-		"exit_codes": map[string]int{
-			"ok":          0,
-			"param_error": 2,
-			"conn_error":  3,
-			"timeout":     4,
-			"internal":    5,
-		},
-	})
+	writeJSON(w, http.StatusOK, app.CommandSchema())
 }
 
 // =============================================================================
@@ -401,7 +394,7 @@ type scanRequest struct {
 	// IgnoreCase mirrors the CLI --ignore-case flag (default true). A pointer
 	// lets the client explicitly request case-sensitive matching (false).
 	IgnoreCase *bool `json:"ignore_case,omitempty"`
-	Timeout    int    `json:"timeout,omitempty"`
+	Timeout    int   `json:"timeout,omitempty"`
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
@@ -804,6 +797,71 @@ func (s *Server) handleDeleteSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "deleted", "deleted": n})
+}
+
+// =============================================================================
+// Settings (configurable data directory)
+// =============================================================================
+
+// handleGetSettings renders the shared config.DataLayout (the same struct the
+// CLI prints) plus two service-runtime fields: a running process keeps the
+// directory it started with until `kp restart`.
+func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	layout, err := config.DataLayout()
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, 5, "read settings: "+err.Error(), "")
+		return
+	}
+	b, _ := json.Marshal(layout)
+	var out map[string]interface{}
+	_ = json.Unmarshal(b, &out)
+	out["active_data_dir"] = s.app.DataDir
+	out["pending_change"] = filepath.Clean(layout.DataDir) != filepath.Clean(s.app.DataDir)
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handlePutSettings persists a new data directory. The running process keeps
+// using its original directory until restart; config.SetDataDir is shared with
+// the CLI so both ends validate and report identically.
+func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		DataDir     string `json:"data_dir"`
+		CopyCurrent *bool  `json:"copy_current"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, http.StatusBadRequest, 2, "invalid JSON: "+err.Error(), "")
+		return
+	}
+	// Omitted copy_current defaults to true: switching directories must not
+	// silently drop all profiles / audit history.
+	copyCurrent := true
+	if body.CopyCurrent != nil {
+		copyCurrent = *body.CopyCurrent
+	}
+	res, err := config.SetDataDir(body.DataDir, s.app.DataDir, copyCurrent)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, 2, err.Error(), "check the path and write permissions")
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+// handleMigrateSettings runs the one-time legacy -> current data dir move.
+// Source files are kept for rollback; existing destination files are never
+// overwritten. A `force` body field re-checks after the marker was set.
+func (s *Server) handleMigrateSettings(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Force bool `json:"force"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&body) // empty body is allowed
+	}
+	res, err := config.MigrateData(s.app.DataDir, body.Force)
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, 5, "migrate data: "+err.Error(), "")
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
 }
 
 // handleAuditStream pushes new/changed ops via Server-Sent Events.

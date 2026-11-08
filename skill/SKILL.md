@@ -3,9 +3,9 @@ name: kp-cli
 description: >-
   Kafka Pilot (kp) 命令行的使用指南。当需要操作 Kafka——
   查询/描述 topic 与分区、按关键字(key 表达式)/key/时间窗/offset 扫描消息、单条或批量生产消息、
-  查看 consumer group 积压(lag)、管理审计与会话、选择/配置连接 profile、启动/停止/重启
-  本地服务——且目标是通过 kp 的 CLI 完成时，加载本 skill。
-  涵盖 profile 选择策略、所有子命令与 flag、扫描结果字段口径、退出码。
+  查看 consumer group 积压(lag)、管理审计与会话、选择/配置连接 profile、配置/迁移数据目录、
+  启动/停止/重启本地服务——且目标是通过 kp 的 CLI 完成时，加载本 skill。
+  涵盖 profile 选择策略、数据目录与一次性迁移、所有子命令与 flag、扫描结果字段口径、退出码。
 ---
 
 # Kafka Pilot CLI 指南
@@ -23,7 +23,7 @@ Kafka Pilot（命令名 `kp`）是一个单二进制的 Kafka 数据工具，提
 - 按 key / 关键字 / 时间窗 / offset 范围在 Kafka 里翻找消息（排查数据是否写入、落哪个分区）。
 - 向 topic 写一条/一批消息（含脚本化批量造数、dry-run 预览）。
 - 查 consumer group 的积压（lag）排查消费延迟。
-- 配置/修改 Kafka 连接（profile），或启动/停止/重启本地 kp 服务。
+- 配置/修改 Kafka 连接（profile），查看/修改/迁移数据目录（`kp settings`），或启动/停止/重启本地 kp 服务。
 - 审计“谁在什么时候对哪个 topic 做了什么”（kp 自带操作审计）。
 
 > 注意：kp 是**只读/写数据的运维工具**，不负责创建 topic、改分区数、建 ACL 等集群管理动作（也**没有**相关命令）。
@@ -50,6 +50,8 @@ kp 通过「连接 profile」区分不同的 Kafka 集群。执行任何读写�
 
 > **会话与审计**：作为 AI Agent，每次任务开始前先 `kp session new` 拿到 6 位短 ID，之后**每条命令显式携带 `--session <id>` 与 `--intent "<你的意图>"`**，便于在观测区按会话追溯。未带 `--session` 的命令会归入名为 `default` 的兜底会话。
 
+> **数据目录异常时**：`kp profile list` 为空或不是预期的 profile，先 `kp settings show` 检查 `active_data_dir`（服务生效目录）与 `data_dir`（配置值）是否一致——常见原因是改过数据目录却没 `kp restart`，或 `KP_APPDATA` 指向了别的目录。**不要盲目重新添加 profile**。
+
 ---
 
 ## 3. 快速开始
@@ -58,10 +60,13 @@ kp 通过「连接 profile」区分不同的 Kafka 集群。执行任何读写�
 kp --help                     # 顶层命令列表
 kp <command> --help            # 某命令的 flag 列表
 kp schema                     # 机器可读：命令清单 + 退出码（可直接解析）
+kp settings show               # 当前数据目录布局（profile / 审计数据在哪）
 ```
 
-顶层命令：`profile` `topic` `group` `scan` `produce` `session` `audit` `key-partition` `schema`
+顶层命令：`profile` `topic` `group` `scan` `produce` `session` `audit` `key-partition` `schema` `settings`
 `serve` `desktop` `stop` `restart`。
+
+**数据目录（FR-16；排查「profile 突然不见了」先看这里）**：profile（`config.yaml`）与审计库（`audit.db`）默认在 **kp.exe 同目录 `kp-data/`**；`kp-settings.yaml` 固定放 kp.exe 旁，其 `data_dir` 可把数据目录改到任意位置（相对路径基于 exe 目录，绝对路径原样）。优先级：`KP_APPDATA` 环境变量 > `kp-settings.yaml` 的 `data_dir` > 默认 `kp-data`。首次启动会把旧位置（Windows `%APPDATA%/kafka-pilot`，Linux / macOS `~/.kafka-pilot`）的数据**一次性复制**过来：不删除源文件、不覆盖目标已有文件、`audit.db` 与 `-wal`/`-shm` 整组复制。**改目录或迁移后必须 `kp restart`**；`GET /api/settings` 的 `active_data_dir` 是服务实际生效目录，`pending_change=true` 表示配置已改但服务未重启。完整命令见 §5.11。
 
 ---
 
@@ -279,8 +284,32 @@ kp produce --topic orders --script gen.js --count 10 --dry-run --profile prod   
 | `kp restart` | 停旧进程后**以相同端口**重启，配置重载（不依赖 Kafka 连接） |
 
 - 服务**只监听 `127.0.0.1`**（本机），远程访问不到。
-- `stop`/`restart` 通过 `KP_APPDATA` 目录下的 `kp.pid` 定位实例（记录 `pid`/`port`/`started_at`），**不接收端口参数**，因此 stop/restart 与 serve 必须在同一 `KP_APPDATA` 下。
+- `stop`/`restart` 通过 **kp.exe 同目录**的 `kp.pid` 定位实例（记录 `pid`/`port`/`started_at`），**不接收端口参数**。pid 文件与数据目录解耦，改了 `data_dir` 后仍能停止服务；读取时还会兼容查找旧版本写在数据目录 / `%APPDATA%` 下的 pid 文件。
+- **修改数据目录后必须 `kp restart`**：服务只在启动时解析一次目录并持有 SQLite 连接；`GET /api/settings` 的 `active_data_dir`（生效目录）与 `pending_change=true` 表示配置已改但尚未重启。
 - ⚠️ **常驻注意**：服务是前台长驻进程。若用 `./kp serve &` 在普通 shell 里起，shell 退出会被回收，表现就是“服务莫名其妙没了”。需要长期常驻时，请用工具/系统的后台任务机制拉起。
+
+### 5.11 `settings` — 数据目录配置与一次性迁移（FR-16）
+
+| 命令 | 说明 |
+|------|------|
+| `kp settings show` | 输出当前布局（JSON）：`data_dir` / `default_data_dir` / `legacy_dir` / `settings_path` / `config_path` / `audit_path` / `*_exists` / `migrated_from` / `migrated_at` / `migration_done` / `env_override` / `restart_required_on_change` |
+| `kp settings set-data-dir <path> [--copy-current=false]` | 修改 `data_dir`；相对路径基于 exe 目录，绝对路径原样；默认把当前目录的 `config.yaml` + audit 三件套复制过去 |
+| `kp settings migrate [--force]` | 从旧位置一次性复制数据；`--force` 忽略 `migration_done` 标记复查（仍不覆盖） |
+
+- **纯本地管理命令**：不连 Kafka、不需要服务运行、不写审计记录；因此不需要 `--session` / `--intent`，也不要给它加 `--profile`。
+- **优先级**：`KP_APPDATA` > `kp-settings.yaml` 的 `data_dir` > 默认 `<exe 目录>/kp-data`。设置 `KP_APPDATA` 时源=目标，自动迁移不触发。
+- **迁移安全规则**（CLI / REST / UI 一致）：只复制不删除；目标已有文件绝不覆盖；`audit.db` + `audit.db-wal` + `audit.db-shm` 整组复制；`migration_done` 保证只做一次。建议先 `kp stop` 再迁移 / 切目录，避免 WAL 复制少最后几条记录。
+- **重启语义**：改目录 / 迁移后必须 `kp restart`；运行中服务的目录不变。`GET /api/settings` 额外返回 `active_data_dir` 与 `pending_change`。
+- **输出字段**：`set-data-dir` / `migrate` 返回 `status` / `data_dir` / `configured` / `previous_data_dir` / `settings_path` / `copied[]` / `skipped[]` / `already_done` / `restart_required` / `hint` / `note`（部分字段仅对应命令出现）。**`copied` / `skipped` 恒为数组（可能为空），不是 null**。
+- **REST 对称**：`GET /api/settings`、`PUT /api/settings`（`{"data_dir":"...","copy_current":true}`）、`POST /api/settings/migrate`（`{"force":false}`）。
+- **排查**：profile 列表为空 → 先 `kp settings show`；`env_override` 非空说明被 `KP_APPDATA` 覆盖；`pending_change` 为真说明需要 `kp restart`。
+
+```bash
+kp settings show
+kp settings set-data-dir kp-data
+kp settings set-data-dir D:/kafka-pilot-data --copy-current=false
+kp settings migrate
+```
 
 ---
 
@@ -322,3 +351,27 @@ kp group lag my-consumer --topic orders --profile prod
 ```bash
 kp serve --port 18080        # 启动本地服务（仅监听 127.0.0.1）
 ```
+
+**场景 E：确认数据目录 / 迁移旧数据 / 切换目录**
+```bash
+kp settings show                       # 先看生效目录与迁移标记
+kp stop                                # 迁移 / 切目录前先停服务
+kp settings migrate                    # 从旧 %APPDATA% 一次性复制（源保留）
+kp settings set-data-dir D:/kp-data    # 或改到其它目录（默认复制现有数据）
+kp restart                             # 让服务切到新目录
+```
+
+---
+
+## 8. REST 端点速查（`kp serve` 时，仅 127.0.0.1）
+
+| 端点 | 用途 |
+|------|------|
+| `GET /api/health`、`GET /api/schema` | 健康检查 / 命令契约 |
+| `GET/POST/PUT/DELETE /api/profiles[/...]` | profile 管理 |
+| `GET /api/topics[/{topic}]`、`GET /api/key-partition` | topic 浏览 / key 落点 |
+| `POST /api/scan`、`POST /api/produce`、`POST /api/produce/batch` | 查询 / 注入 |
+| `GET /api/groups[/{group}/lag]` | 消费组 lag |
+| `GET /api/sessions[/{id}]`、`DELETE /api/sessions` | 会话（新建 / 结束为 CLI 专属） |
+| `GET /api/audit/ops[/{op_id}][/snapshot]`、`DELETE /api/audit[/ops]`、`GET /api/audit/stream` | 审计 / SSE |
+| `GET /api/settings`、`PUT /api/settings`、`POST /api/settings/migrate` | 数据目录布局 / 修改 / 一次性迁移 |

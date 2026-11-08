@@ -16,8 +16,12 @@ import type {
   ScanRequestBody,
   ScanResult,
   Session,
+  MigrationResult,
+  SettingsInfo,
   Snapshot,
   TopicInfo,
+  UpdateSettingsBody,
+  UpdateSettingsResult,
 } from './types'
 
 const API_BASE = '/api'
@@ -156,6 +160,19 @@ export const api = {
     request<{ status: string; deleted: number }>('/sessions', {
       method: 'DELETE',
       body: JSON.stringify({ session_ids: ids }),
+    }),
+
+  // Settings (configurable data directory)
+  getSettings: () => request<SettingsInfo>('/settings'),
+  updateSettings: (body: UpdateSettingsBody) =>
+    request<UpdateSettingsResult>('/settings', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    }),
+  migrateSettings: (force = false) =>
+    request<MigrationResult>('/settings/migrate', {
+      method: 'POST',
+      body: JSON.stringify({ force }),
     }),
 
   // Health (used for connection-status indicator in the top bar)

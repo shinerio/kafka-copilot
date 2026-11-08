@@ -25,20 +25,30 @@ type App struct {
 	Audit  *audit.Store
 	Closed bool
 
+	// DataDir is the resolved root directory for config.yaml (profiles) and
+	// audit.db (audit / cached scan data). Configurable via settings.
+	DataDir string
+	// LegacyDir is the old fixed app-data location, kept for display/migration.
+	LegacyDir string
+
 	// Settings
 	LagThreshold    int64
 	SnapshotEnabled bool
 }
 
-// New creates a new App with default paths.
+// New creates a new App with the resolved (configurable) data directory.
 func New() (*App, error) {
+	dataDir, err := config.DataDir()
+	if err != nil {
+		return nil, fmt.Errorf("data dir: %w", err)
+	}
+
 	cfgMgr, err := config.NewManager()
 	if err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
 
-	appData := config.AppDataDir()
-	auditPath := filepath.Join(appData, "audit.db")
+	auditPath := filepath.Join(dataDir, "audit.db")
 	store, err := audit.Open(auditPath)
 	if err != nil {
 		return nil, fmt.Errorf("audit: %w", err)
@@ -52,6 +62,8 @@ func New() (*App, error) {
 		Config:          cfgMgr,
 		Kafka:           kafka.NewPool(),
 		Audit:           store,
+		DataDir:         dataDir,
+		LegacyDir:       config.LegacyAppDataDir(),
 		LagThreshold:    10000,
 		SnapshotEnabled: true,
 	}, nil
@@ -658,4 +670,24 @@ func GetActor() string {
 		return user
 	}
 	return "unknown"
+}
+
+// CommandSchema is the single source of truth for `kp schema` and
+// `GET /api/schema`. Keeping it in the shared use-case layer prevents the CLI
+// and REST command lists from drifting apart when a command is added.
+func CommandSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"commands": []string{
+			"profile", "topic", "group", "scan", "produce",
+			"session", "audit", "schema", "settings", "key-partition",
+			"serve", "desktop", "stop", "restart",
+		},
+		"exit_codes": map[string]int{
+			"ok":          0,
+			"param_error": 2,
+			"conn_error":  3,
+			"timeout":     4,
+			"internal":    5,
+		},
+	}
 }

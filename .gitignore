@@ -1,1 +1,6 @@
 .workbuddy
+# 运行时数据（含 DPAPI 加密的 profile 凭据），不要提交
+kp-data/
+kp-settings.yaml
+kp.pid
+backup/

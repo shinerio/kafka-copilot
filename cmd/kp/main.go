@@ -61,6 +61,7 @@ func main() {
 		newSessionCmd(),
 		newAuditCmd(),
 		newSchemaCmd(),
+		newSettingsCmd(),
 		newKeyPartitionCmd(),
 		newServeCmd(),
 		newDesktopCmd(),
@@ -822,32 +823,92 @@ func newSchemaCmd() *cobra.Command {
 		Use:   "schema",
 		Short: "Output machine-readable command schema (JSON)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			schema := map[string]interface{}{
-			"commands": []string{
-				"profile", "topic", "group", "scan", "produce",
-				"session", "audit", "schema", "key-partition",
-				"serve", "desktop", "stop", "restart",
-			},
-				"exit_codes": map[string]int{
-					"ok":          0,
-					"param_error": 2,
-					"conn_error":  3,
-					"timeout":     4,
-					"internal":    5,
-				},
-			}
-			output(schema)
+			output(app.CommandSchema())
 			return nil
 		},
 	}
+}
+
+// --- Settings Commands (configurable data directory) ---
+
+func newSettingsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "settings",
+		Short: "Show or change where kp stores profiles and audit data",
+		// Pure local file management: no Kafka connection and no app.New()
+		// side effects before an explicit migrate/set command.
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return nil
+		},
+	}
+	cmd.AddCommand(settingsShowCmd(), settingsSetDataDirCmd(), settingsMigrateCmd())
+	return cmd
+}
+
+func settingsShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "Show the active data directory layout (JSON)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			layout, err := config.DataLayout()
+			if err != nil {
+				return err
+			}
+			output(layout)
+			return nil
+		},
+	}
+}
+
+func settingsSetDataDirCmd() *cobra.Command {
+	var copyCurrent bool
+	c := &cobra.Command{
+		Use:   "set-data-dir <path>",
+		Short: "Set the data directory (relative paths resolve next to kp.exe)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			res, err := config.SetDataDir(args[0], "", copyCurrent)
+			if err != nil {
+				return err
+			}
+			output(res)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&copyCurrent, "copy-current", true,
+		"copy existing config.yaml / audit.db into the new directory (use --copy-current=false to start empty)")
+	return c
+}
+
+func settingsMigrateCmd() *cobra.Command {
+	var force bool
+	c := &cobra.Command{
+		Use:   "migrate",
+		Short: "One-time move of legacy %APPDATA%/kafka-pilot data into the active data dir",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			layout, err := config.DataLayout()
+			if err != nil {
+				return err
+			}
+			res, err := config.MigrateData(layout.DataDir, force)
+			if err != nil {
+				return err
+			}
+			output(res)
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&force, "force", false,
+		"re-check the legacy directory even after the one-time marker was set")
+	return c
 }
 
 // --- Key-Partition Command (read-only helper) ---
 
 func newKeyPartitionCmd() *cobra.Command {
 	var (
-		topic   string
-		key     string
+		topic string
+		key   string
 	)
 	c := &cobra.Command{
 		Use:   "key-partition",
@@ -864,11 +925,11 @@ func newKeyPartitionCmd() *cobra.Command {
 				return err
 			}
 			output(map[string]interface{}{
-				"topic":            topic,
-				"key":              key,
-				"partition":        partition,
-				"partition_count":  count,
-				"algorithm":        "murmur2(key) & 0x7fffffff % partition_count",
+				"topic":           topic,
+				"key":             key,
+				"partition":       partition,
+				"partition_count": count,
+				"algorithm":       "murmur2(key) & 0x7fffffff % partition_count",
 			})
 			return nil
 		},

@@ -242,3 +242,53 @@ export interface ApiError {
   message: string
   hint?: string
 }
+
+// --- Settings (configurable data directory) ---
+
+export interface SettingsInfo {
+  data_dir: string
+  default_data_dir: string
+  legacy_dir: string
+  settings_path: string
+  config_path: string
+  audit_path: string
+  config_exists: boolean
+  audit_exists: boolean
+  legacy_config_exists: boolean
+  legacy_audit_exists: boolean
+  migrated_from: string
+  migrated_at: string
+  migration_done: boolean
+  env_override?: string
+  restart_required_on_change: boolean
+  // REST-only service-runtime fields (a running process keeps its start dir).
+  active_data_dir?: string
+  pending_change?: boolean
+}
+
+export interface UpdateSettingsBody {
+  data_dir: string
+  copy_current?: boolean
+}
+
+export interface UpdateSettingsResult {
+  status: string
+  data_dir: string
+  configured: string
+  previous_data_dir: string
+  settings_path: string
+  copied: string[]
+  skipped: string[]
+  restart_required: boolean
+  hint: string
+}
+
+export interface MigrationResult {
+  source: string
+  dest: string
+  copied: string[]
+  skipped: string[]
+  already_done: boolean
+  restart_required: boolean
+  note?: string
+}

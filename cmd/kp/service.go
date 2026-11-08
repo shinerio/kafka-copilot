@@ -23,13 +23,36 @@ const pidFileName = "kp.pid"
 // errProcessGone indicates the recorded PID is no longer running.
 var errProcessGone = errors.New("process not running")
 
+// pidFilePath is stable: it lives next to the executable, NOT inside the
+// (movable) data directory. Otherwise a data_dir change would make `kp stop` /
+// `kp restart` unable to find the already-running service.
 func pidFilePath() string {
-	return filepath.Join(config.AppDataDir(), pidFileName)
+	return filepath.Join(config.ExeDir(), pidFileName)
+}
+
+// pidFileCandidates also covers pid files written by older builds (data dir /
+// legacy app-data dir), so stop/restart can adopt a running old instance.
+func pidFileCandidates() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(p string) {
+		abs, err := filepath.Abs(p)
+		if err != nil || abs == "" || seen[abs] {
+			return
+		}
+		seen[abs] = true
+		out = append(out, abs)
+	}
+	add(pidFilePath())
+	if layout, err := config.DataLayout(); err == nil {
+		add(filepath.Join(layout.DataDir, pidFileName))
+	}
+	add(filepath.Join(config.LegacyAppDataDir(), pidFileName))
+	return out
 }
 
 // writePIDFile records the serve process PID and port so `kp stop` / `kp
-// restart` can locate the running instance. It lives in the same config
-// directory the serve process already resolves via KP_APPDATA / default.
+// restart` can locate the running instance.
 func writePIDFile(port int) error {
 	data, err := json.MarshalIndent(map[string]interface{}{
 		"pid":        os.Getpid(),
@@ -39,26 +62,45 @@ func writePIDFile(port int) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(pidFilePath(), data, 0o644)
+	if err := os.WriteFile(pidFilePath(), data, 0o644); err != nil {
+		// Read-only install directory: fall back to the data directory.
+		if dir, derr := config.DataDir(); derr == nil {
+			return os.WriteFile(filepath.Join(dir, pidFileName), data, 0o644)
+		}
+		return err
+	}
+	return nil
 }
 
 func readPIDFile() (pid int, port int, err error) {
-	b, err := os.ReadFile(pidFilePath())
-	if err != nil {
-		return 0, 0, err
+	var lastErr error = os.ErrNotExist
+	for _, p := range pidFileCandidates() {
+		b, e := os.ReadFile(p)
+		if e != nil {
+			lastErr = e
+			continue
+		}
+		var v struct {
+			PID  int `json:"pid"`
+			Port int `json:"port"`
+		}
+		if e := json.Unmarshal(b, &v); e != nil {
+			lastErr = e
+			continue
+		}
+		if v.PID > 0 {
+			return v.PID, v.Port, nil
+		}
 	}
-	var v struct {
-		PID  int `json:"pid"`
-		Port int `json:"port"`
-	}
-	if err := json.Unmarshal(b, &v); err != nil {
-		return 0, 0, err
-	}
-	return v.PID, v.Port, nil
+	return 0, 0, lastErr
 }
 
+// removePIDFile clears every candidate so stale files cannot resurrect a
+// stopped service on the next `kp stop`.
 func removePIDFile() {
-	_ = os.Remove(pidFilePath())
+	for _, p := range pidFileCandidates() {
+		_ = os.Remove(p)
+	}
 }
 
 // killProcess terminates the given PID in a cross-platform way.
@@ -100,7 +142,7 @@ func stopServe() error {
 }
 
 // restartServe stops the old service (if any) and becomes the new serve
-// process, reloading config from the same KP_APPDATA directory.
+// process, reloading config from the currently configured data directory.
 func restartServe() error {
 	pid, port, err := readPIDFile()
 	if err == nil {

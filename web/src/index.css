@@ -731,6 +731,30 @@ body.kp-col-resizing * {
   height: auto;
   min-height: 100%;
 }
+.kp-fill--settings {
+  /* 同 v1.3b/1.3e 根因：height:100% 会把下方卡片裁掉且无滚动条 */
+  height: auto;
+  min-height: 100%;
+}
+
+/* 数据目录：路径定义列表（长路径自动换行，不撑破卡片） */
+.kp-path-grid {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.kp-path-grid > .kp-cell-mono {
+  white-space: normal;
+  word-break: break-all;
+}
+@media (max-width: 720px) {
+  .kp-path-grid {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
 .kp-card.kp-card--batch {
   /* Fluent 运行时注入 overflow:hidden；覆盖以让粘性操作栏可贴住滚动主区 */
   overflow: visible !important;

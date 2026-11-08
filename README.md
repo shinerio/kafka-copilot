@@ -64,7 +64,7 @@ kp stop
 
 > **实现说明**：`kp serve` / `kp desktop` 启动时会把 PID 与端口写入 `<应用数据目录>/kp.pid`。`kp stop` 读取该文件并结束对应进程，`kp restart` 先停旧进程再以相同端口启新进程。`stop` / `restart` 不依赖 Kafka 连接，因此即使配置损坏也能执行。
 
-> **重要**：因为服务是长驻进程，**修改了连接配置（尤其是 SASL 密码）后必须重启服务**才能让新配置生效——仅改文件或 UI 保存而不重启，旧进程仍用旧内存。使用新二进制后，`kp restart` 即可。
+> **动态更新**：通过 Web UI「设置」页或 `PUT /api/profiles` 保存 profile 会**即时生效**（内存更新 + 落盘 + 失效该 profile 的 Kafka 连接缓存），**无需重启**。`kp restart` 仅在两种情况下才需要：① 你**直接手改了 `config.yaml` 文件**（绕过 UI/API，内存不会刷新）；② 用的是修复前的旧二进制（曾有内存污染 bug，保存反而会坏）。
 
 ---
 
@@ -190,7 +190,7 @@ kp schema        # 输出可用命令与退出码（JSON）
 ## 7. 常见问题
 
 **Q：改了 SASL 密码，Web UI 还是连不上？**
-A：服务是长驻进程，旧进程内存不会自动刷新。用 `kp restart`（或先 `kp stop` 再 `kp serve`）重启即可。CLI 每次是新进程，不受影响。
+A：通过 Web UI / API 保存是**即时动态生效**的，本不需要重启。若仍连不上，常见原因是：① SASL `mechanism` 与服务端不一致；② 之前手改过 `config.yaml` 文件却没重启（内存未刷新）。先 `GET /api/profiles` 确认实际生效的 `mechanism` / 端口，再决定是否 `kp restart`。
 
 **Q：`broker closed the connection ... is SASL missing?`**
 A：通常是 TLS 没配对。若 broker 是 `SASL_SSL`（9093），必须加 `--tls`（`SASL_PLAINTEXT` / 9092 不需要）。也可能是 `mechanism` 与服务端不一致，或密码错误。

@@ -65,6 +65,7 @@ type Filter struct {
 	decoder   Decoder
 	keyRegex  *regexp.Regexp
 	jqCode    *gojq.Code
+	kwExpr    kwNode
 
 	SkippedNonUTF8Key int
 }
@@ -91,6 +92,11 @@ func New(cfg FilterConfig) (*Filter, error) {
 		if err != nil {
 			return nil, fmt.Errorf("jq expression compile error: %w", err)
 		}
+	}
+	if cfg.Keyword != "" {
+		// Pre-compile the keyword expression. On failure (invalid syntax),
+		// kwExpr stays nil and Apply falls back to a plain substring match.
+		f.kwExpr, _ = CompileKeyword(cfg.Keyword)
 	}
 	return f, nil
 }
@@ -180,33 +186,26 @@ func (f *Filter) Apply(msg *Message) (*Result, bool) {
 		}
 	}
 
-	// Layer 2: keyword filter
+	// Layer 2: keyword filter (supports AND/OR/NOT + parentheses expression)
 	if f.config.Keyword != "" {
-		valueStr := toString(decoded)
-		if f.config.IgnoreCase {
-			if !strings.Contains(strings.ToLower(valueStr), strings.ToLower(f.config.Keyword)) {
+		searchText := buildSearchText(keyStr, decoded, r.Headers)
+		if f.kwExpr != nil {
+			if !f.kwExpr.eval(searchText) {
 				return r, false
 			}
 		} else {
-			if !strings.Contains(valueStr, f.config.Keyword) {
+			// Fallback: plain case-insensitive substring match.
+			if !strings.Contains(strings.ToLower(searchText), strings.ToLower(f.config.Keyword)) {
 				return r, false
 			}
 		}
 	}
 
-	// Layer 3: jq expression filter
+	// Layer 3: jq expression filter — operates on the parsed message body.
+	// Example: `.amount == 352`, `.status == "FAILED"`.
 	if f.jqCode != nil {
-		ctx := map[string]any{
-			"key":       keyStr,
-			"value":     decoded,
-			"headers":   r.Headers,
-			"partition": msg.Partition,
-			"offset":    msg.Offset,
-			"timestamp": msg.Timestamp.Format(time.RFC3339Nano),
-			"size":      msg.Size,
-		}
 		matched := false
-		iter := f.jqCode.Run(ctx)
+		iter := f.jqCode.Run(decoded)
 		for {
 			v, ok := iter.Next()
 			if !ok {

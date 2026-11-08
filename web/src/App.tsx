@@ -6,6 +6,8 @@
 import { FluentProvider, webLightTheme, Toaster, makeStyles } from '@fluentui/react-components'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Layout } from './components/Layout'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { useResizableTables } from './components/resizableTables'
 import type { PageKey } from './components/Layout'
 import { api } from './api'
 import type { Profile } from './types'
@@ -31,6 +33,8 @@ const DEV_PROXY_PORT = 18080
 export default function App() {
   const styles = useStyles()
   const [page, setPage] = useState<PageKey>('topics')
+  // Every table on the current page gets drag-to-resize / double-click auto-fit.
+  useResizableTables(page)
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [activeProfile, setActiveProfile] = useState('')
   const [connected, setConnected] = useState(false)
@@ -114,18 +118,20 @@ export default function App() {
 
   return (
     <FluentProvider theme={webLightTheme} className={styles.root}>
-      <Layout
-        page={page}
-        onNavigate={setPage}
-        profiles={profiles}
-        activeProfile={activeProfile}
-        onSelectProfile={handleSelectProfile}
-        connected={connected}
-        port={connected ? DEV_PROXY_PORT : null}
-        actor={actor}
-      >
-        {pageEl}
-      </Layout>
+      <ErrorBoundary label="应用外壳">
+        <Layout
+          page={page}
+          onNavigate={setPage}
+          profiles={profiles}
+          activeProfile={activeProfile}
+          onSelectProfile={handleSelectProfile}
+          connected={connected}
+          port={connected ? DEV_PROXY_PORT : null}
+          actor={actor}
+        >
+          <ErrorBoundary label={page}>{pageEl}</ErrorBoundary>
+        </Layout>
+      </ErrorBoundary>
       <Toaster />
     </FluentProvider>
   )

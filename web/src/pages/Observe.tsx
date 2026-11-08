@@ -1,5 +1,5 @@
 // AI observation page (FR-09/10): session list -> op timeline -> op detail
-// (command, status, result stats) with a snapshot replay button.
+// with snapshot replay. Sessions and ops can be multi-selected and deleted.
 
 import {
   Title3,
@@ -16,12 +16,15 @@ import {
   Divider,
   makeStyles,
   tokens,
+  MessageBar,
+  MessageBarBody,
 } from '@fluentui/react-components'
 import {
   ArrowClockwiseRegular,
   HistoryRegular,
   PlayCircleRegular,
   EyeRegular,
+  DeleteRegular,
 } from '@fluentui/react-icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, opDuration, opId, opStarted, sessionId, sessionEnded, sessionStarted, snapshotMessages } from '../api'
@@ -91,6 +94,12 @@ export function ObservePage() {
   const [opsLoading, setOpsLoading] = useState(false)
   const [error, setError] = useState<unknown>(null)
 
+  // Multi-select state (#4)
+  const [checkedOps, setCheckedOps] = useState<string[]>([])
+  const [checkedSessions, setCheckedSessions] = useState<string[]>([])
+  const [deleting, setDeleting] = useState(false)
+  const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null)
+
   const loadSessions = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -114,6 +123,7 @@ export function ObservePage() {
     setOpsLoading(true)
     setSelectedOp(null)
     setSnapshot(null)
+    setCheckedOps([])
     try {
       const list = await api.listOps({ session: selectedSession })
       setOps(list || [])
@@ -147,21 +157,105 @@ export function ObservePage() {
     return snapshotMessages(snapshot)
   }, [snapshot])
 
+  const toggleOp = (id: string) =>
+    setCheckedOps((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  const toggleSession = (id: string) =>
+    setCheckedSessions((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    )
+
+  const allOpsChecked = ops.length > 0 && checkedOps.length === ops.length
+  const toggleAllOps = () => setCheckedOps(allOpsChecked ? [] : ops.map((o) => opId(o)))
+  const allSessionsChecked = sessions.length > 0 && checkedSessions.length === sessions.length
+  const toggleAllSessions = () =>
+    setCheckedSessions(allSessionsChecked ? [] : sessions.map((s) => sessionId(s)))
+
+  const deleteSelectedOps = useCallback(async () => {
+    if (checkedOps.length === 0) return
+    if (!window.confirm(`确认删除选中的 ${checkedOps.length} 条操作记录？（含其命中快照）`)) return
+    setDeleting(true)
+    try {
+      const res = await api.deleteOps(checkedOps)
+      setNotice({ kind: 'ok', text: `已删除 ${res.deleted} 条操作记录` })
+      setCheckedOps([])
+      setSelectedOp(null)
+      setSnapshot(null)
+      await loadOps()
+    } catch (e) {
+      setNotice({ kind: 'error', text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setDeleting(false)
+    }
+  }, [checkedOps, loadOps])
+
+  const deleteSelectedSessions = useCallback(async () => {
+    if (checkedSessions.length === 0) return
+    if (
+      !window.confirm(
+        `确认删除选中的 ${checkedSessions.length} 个会话？该会话下的全部操作记录与快照将一并删除。`,
+      )
+    )
+      return
+    setDeleting(true)
+    try {
+      const res = await api.deleteSessions(checkedSessions)
+      setNotice({ kind: 'ok', text: `已删除 ${res.deleted} 个会话` })
+      if (selectedSession && checkedSessions.includes(selectedSession)) {
+        setSelectedSession(null)
+        setOps([])
+        setSelectedOp(null)
+        setSnapshot(null)
+        setCheckedOps([])
+      }
+      setCheckedSessions([])
+      await loadSessions()
+    } catch (e) {
+      setNotice({ kind: 'error', text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setDeleting(false)
+    }
+  }, [checkedSessions, selectedSession, loadSessions])
+
   return (
     <div className="kp-fill" style={{ gap: 12 }}>
       <div className="kp-row">
         <Title3>AI 观测区</Title3>
         <div className="kp-grow" />
+        <Button
+          size="small"
+          appearance="subtle"
+          icon={<DeleteRegular />}
+          disabled={deleting || checkedSessions.length === 0}
+          onClick={deleteSelectedSessions}
+        >
+          删除选中会话{checkedSessions.length ? ` (${checkedSessions.length})` : ''}
+        </Button>
         <Button icon={<ArrowClockwiseRegular />} appearance="subtle" onClick={loadSessions}>
           刷新
         </Button>
       </div>
 
       {Boolean(error) && <ErrorState error={error} />}
+      {notice && (
+        <MessageBar intent={notice.kind === 'ok' ? 'success' : 'error'}>
+          <MessageBarBody>{notice.text}</MessageBarBody>
+        </MessageBar>
+      )}
 
       <div className={styles.shell}>
         {/* Sessions */}
         <div className={styles.listWrap}>
+          {sessions.length > 0 && (
+            <div className="kp-combo__tools" style={{ position: 'static' }}>
+              <input
+                type="checkbox"
+                aria-label="全选会话"
+                checked={allSessionsChecked}
+                onChange={toggleAllSessions}
+              />
+              <span className="kp-muted">全选 / 已选 {checkedSessions.length}</span>
+            </div>
+          )}
           {loading && <LoadingRow />}
           {!loading && sessions.length === 0 && <EmptyState title="无会话" />}
           {sessions.map((s) => {
@@ -174,7 +268,16 @@ export function ObservePage() {
                 }
                 onClick={() => setSelectedSession(id)}
               >
-                <Body1 className="kp-cell-mono kp-truncate">{id}</Body1>
+                <div className="kp-row" style={{ gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    aria-label={`选择会话 ${id}`}
+                    checked={checkedSessions.includes(id)}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={() => toggleSession(id)}
+                  />
+                  <Body1 className="kp-cell-mono kp-truncate">{id}</Body1>
+                </div>
                 <Body1 className="kp-tertiary" style={{ fontSize: 12 }}>
                   {s.label || '(无标签)'} · {s.op_count} ops
                 </Body1>
@@ -196,12 +299,30 @@ export function ObservePage() {
                 <Subtitle2>
                   <HistoryRegular /> 操作时间线
                 </Subtitle2>
+                <div className="kp-grow" />
+                <Button
+                  size="small"
+                  appearance="subtle"
+                  icon={<DeleteRegular />}
+                  disabled={deleting || checkedOps.length === 0}
+                  onClick={deleteSelectedOps}
+                >
+                  删除选中{checkedOps.length ? ` (${checkedOps.length})` : ''}
+                </Button>
                 <Body1 className="kp-muted">{ops.length} 个操作</Body1>
               </div>
               <div className={styles.tableWrap} style={{ marginTop: 8 }}>
                 <Table size="small">
                   <TableHeader>
                     <TableRow>
+                      <TableHeaderCell style={{ width: 36 }}>
+                        <input
+                          type="checkbox"
+                          aria-label="全选操作"
+                          checked={allOpsChecked}
+                          onChange={toggleAllOps}
+                        />
+                      </TableHeaderCell>
                       <TableHeaderCell>Op ID</TableHeaderCell>
                       <TableHeaderCell>Source</TableHeaderCell>
                       <TableHeaderCell>Command</TableHeaderCell>
@@ -213,14 +334,14 @@ export function ObservePage() {
                   <TableBody>
                     {opsLoading && (
                       <TableRow>
-                        <TableCell colSpan={6}>
+                        <TableCell colSpan={7}>
                           <LoadingRow />
                         </TableCell>
                       </TableRow>
                     )}
                     {!opsLoading && ops.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={6}>
+                        <TableCell colSpan={7}>
                           <EmptyState title="无操作记录" />
                         </TableCell>
                       </TableRow>
@@ -237,6 +358,14 @@ export function ObservePage() {
                             setSnapshot(null)
                           }}
                         >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              aria-label={`选择操作 ${id}`}
+                              checked={checkedOps.includes(id)}
+                              onChange={() => toggleOp(id)}
+                            />
+                          </TableCell>
                           <TableCell className="kp-cell-mono kp-truncate" style={{ maxWidth: 140 }}>
                             {id}
                           </TableCell>

@@ -23,10 +23,20 @@ func startServe(port int) error {
 	}
 
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
+
+	// Record PID so `kp stop` / `kp restart` can find this process.
+	if err := writePIDFile(port); err != nil {
+		fmt.Fprintf(os.Stderr, "warn: could not write pid file: %v\n", err)
+	}
+
 	fmt.Printf("Kafka Pilot serving on http://%s\n", addr)
 
 	server := serve.NewServer(flagApp)
-	return server.ListenAndServe(addr)
+	if err := server.ListenAndServe(addr); err != nil {
+		removePIDFile()
+		return err
+	}
+	return nil
 }
 
 // startDesktop starts serve and opens the browser.

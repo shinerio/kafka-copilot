@@ -109,17 +109,42 @@ func (m *Manager) load() error {
 	return nil
 }
 
+// cloneProfile returns a deep copy so callers can mask or encrypt a profile
+// without mutating the in-memory (plaintext) source. The SASL/TLS pointers are
+// copied too: otherwise masking/encrypting the copy would also rewrite the
+// shared object that m.config still points at. That was a real bug -- a GET
+// that masks the password (or a save that encrypts) silently corrupted the
+// live in-memory password used for connections in the long-running serve
+// process, so Web UI saves appeared to "not stick" while CLI (fresh process)
+// kept working.
+func cloneProfile(p Profile) Profile {
+	q := p
+	if p.SASL != nil {
+		s := *p.SASL
+		q.SASL = &s
+	}
+	if p.TLS != nil {
+		t := *p.TLS
+		q.TLS = &t
+	}
+	return q
+}
+
 func (m *Manager) save() error {
-	cfg := *m.config
-	// Encrypt passwords before saving
-	for i := range cfg.Profiles {
-		if cfg.Profiles[i].SASL != nil && cfg.Profiles[i].SASL.Password != "" {
-			if enc, err := Encrypt(cfg.Profiles[i].SASL.Password); err == nil {
-				cfg.Profiles[i].SASL.Password = enc
+	// Deep copy: encrypt for disk WITHOUT mutating the in-memory plaintext.
+	cp := Config{
+		DefaultProfile: m.config.DefaultProfile,
+		Profiles:       make([]Profile, len(m.config.Profiles)),
+	}
+	for i := range m.config.Profiles {
+		cp.Profiles[i] = cloneProfile(m.config.Profiles[i])
+		if cp.Profiles[i].SASL != nil && cp.Profiles[i].SASL.Password != "" {
+			if enc, err := Encrypt(cp.Profiles[i].SASL.Password); err == nil {
+				cp.Profiles[i].SASL.Password = enc
 			}
 		}
 	}
-	data, err := yaml.Marshal(&cfg)
+	data, err := yaml.Marshal(&cp)
 	if err != nil {
 		return fmt.Errorf("marshal config yaml: %w", err)
 	}
@@ -133,13 +158,14 @@ func (m *Manager) save() error {
 func (m *Manager) List() []Profile {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	result := make([]Profile, len(m.config.Profiles))
-	copy(result, m.config.Profiles)
-	// Mask passwords in output
-	for i := range result {
-		if result[i].SASL != nil && result[i].SASL.Password != "" {
-			result[i].SASL.Password = "****"
+	result := make([]Profile, 0, len(m.config.Profiles))
+	for i := range m.config.Profiles {
+		p := cloneProfile(m.config.Profiles[i])
+		// Mask passwords in output
+		if p.SASL != nil && p.SASL.Password != "" {
+			p.SASL.Password = "****"
 		}
+		result = append(result, p)
 	}
 	return result
 }
@@ -150,7 +176,7 @@ func (m *Manager) Get(name string) (*Profile, error) {
 	defer m.mu.RUnlock()
 	for i := range m.config.Profiles {
 		if m.config.Profiles[i].Name == name {
-			p := m.config.Profiles[i]
+			p := cloneProfile(m.config.Profiles[i])
 			return &p, nil
 		}
 	}

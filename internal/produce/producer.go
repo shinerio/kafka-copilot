@@ -10,12 +10,12 @@ import (
 )
 
 // SingleRequest holds single-message produce parameters.
+// The target partition is never specified: franz-go derives it from the key.
 type SingleRequest struct {
-	Topic     string
-	Key       []byte
-	Value     []byte
-	Headers   []kgo.RecordHeader
-	Partition int32 // -1 = auto
+	Topic   string
+	Key     []byte
+	Value   []byte
+	Headers []kgo.RecordHeader
 }
 
 // Producer wraps a kgo.Client for producing.
@@ -36,10 +36,9 @@ func (p *Producer) ProduceSingle(ctx context.Context, req *SingleRequest) (int32
 		Value:   req.Value,
 		Headers: req.Headers,
 	}
-	if req.Partition >= 0 {
-		rec.Partition = req.Partition
-	}
 
+	// Do not set Record.Partition: the client's default partitioner hashes the
+	// key to choose a partition, which is the product-defined behavior.
 	results := p.client.ProduceSync(ctx, rec)
 	if err := results.FirstErr(); err != nil {
 		return 0, 0, fmt.Errorf("produce: %w", err)

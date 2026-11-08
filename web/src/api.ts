@@ -5,6 +5,7 @@
 import type {
   ApiError,
   BatchResult,
+  KeyPartitionInfo,
   LagInfo,
   Op,
   ProduceBatchRequestBody,
@@ -97,6 +98,11 @@ export const api = {
     request<TopicInfo>(`/topics/${encodeURIComponent(topic)}`),
 
   // Scan
+  // Read-only: which partition would the standard Kafka partitioner pick?
+  keyPartition: (topic: string, key: string) =>
+    request<KeyPartitionInfo>(
+      `/key-partition?topic=${encodeURIComponent(topic)}&key=${encodeURIComponent(key)}`,
+    ),
   scan: (body: ScanRequestBody) =>
     request<ScanResult>('/scan', { method: 'POST', body: JSON.stringify(body) }),
 
@@ -140,6 +146,17 @@ export const api = {
     const qs = before ? `?before=${encodeURIComponent(before)}` : ''
     return request<{ status: string }>(`/audit${qs}`, { method: 'DELETE' })
   },
+  // Observation page: delete explicitly selected records.
+  deleteOps: (ids: string[]) =>
+    request<{ status: string; deleted: number }>('/audit/ops', {
+      method: 'DELETE',
+      body: JSON.stringify({ op_ids: ids }),
+    }),
+  deleteSessions: (ids: string[]) =>
+    request<{ status: string; deleted: number }>('/sessions', {
+      method: 'DELETE',
+      body: JSON.stringify({ session_ids: ids }),
+    }),
 
   // Health (used for connection-status indicator in the top bar)
   health: () => request<{ status: string }>('/health'),

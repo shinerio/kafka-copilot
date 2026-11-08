@@ -236,3 +236,783 @@ body {
   font-family: var(--kp-font-mono);
   font-size: 12.5px;
 }
+
+/* Form field label */
+.kp-field-label {
+  font-size: 12px;
+  color: var(--kp-text-secondary);
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+/* Searchable combobox (TopicSelect / PartitionMultiSelect) */
+.kp-combo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  background: #fff;
+  cursor: pointer;
+  min-width: 0;
+}
+.kp-combo:focus-within {
+  border-color: var(--kp-accent);
+}
+.kp-combo__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+  color: var(--kp-text);
+}
+.kp-combo__panel {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  padding: 4px;
+}
+.kp-combo__item {
+  padding: 7px 10px;
+  border-radius: var(--kp-radius);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kp-combo__item:hover {
+  background: var(--kp-bg-alt);
+}
+.kp-combo__item--active {
+  background: var(--kp-bg-alt);
+  font-weight: 600;
+  color: var(--kp-accent);
+}
+.kp-combo__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kp-combo__check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--kp-accent);
+}
+
+/* Native datetime-local picker */
+.kp-datetime {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  background: #fff;
+  font-size: 13px;
+  color: var(--kp-text);
+  width: 100%;
+}
+.kp-datetime:focus {
+  outline: none;
+  border-color: var(--kp-accent);
+}
+
+/* Partition offset chips (Topics page) */
+.kp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border);
+  font-variant-numeric: tabular-nums;
+}
+.kp-chip b {
+  color: var(--kp-accent);
+}
+
+/* Native select — used instead of Fluent Dropdown (popup render crash fix) */
+.kp-select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  background: #fff;
+  color: var(--kp-text);
+  font: inherit;
+  font-size: 13px;
+  min-width: 0;
+  cursor: pointer;
+}
+.kp-select:hover {
+  border-color: var(--kp-accent);
+}
+.kp-select:focus {
+  outline: none;
+  border-color: var(--kp-accent);
+  box-shadow: 0 0 0 1px var(--kp-accent);
+}
+.kp-select:disabled {
+  background: var(--kp-bg-alt);
+  cursor: not-allowed;
+}
+
+/* Dropdown surface rendered through a portal: never clipped by page overflow */
+.kp-combo__tools {
+  position: sticky;
+  top: -4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: #fff;
+  border-bottom: 1px solid var(--kp-border);
+  font-size: 12px;
+}
+.kp-combo__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 2px;
+  padding: 4px;
+}
+.kp-combo__grid .kp-combo__item {
+  padding: 5px 6px;
+}
+.kp-linkbtn {
+  border: none;
+  background: transparent;
+  color: var(--kp-accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.kp-linkbtn:hover {
+  text-decoration: underline;
+}
+.kp-datetime-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.kp-datetime-row .kp-datetime {
+  flex: 1 1 auto;
+}
+
+/* Fixed table layout (Topics page: give offsets most of the width) */
+.kp-table-fixed {
+  table-layout: fixed;
+  width: 100%;
+}
+.kp-table-fixed th,
+.kp-table-fixed td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Error boundary fallback */
+.kp-error-boundary {
+  margin: 16px;
+  padding: 20px;
+  border: 1px solid var(--kp-danger);
+  border-radius: var(--kp-radius-lg);
+  background: #fff7f8;
+}
+.kp-error-boundary h3 {
+  margin: 0 0 8px;
+}
+.kp-error-boundary pre {
+  white-space: pre-wrap;
+  font-family: var(--kp-font-mono);
+  font-size: 12px;
+  color: var(--kp-danger);
+}
+.kp-btn {
+  height: 30px;
+  padding: 5px 14px;
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.kp-btn:hover {
+  background: var(--kp-bg-alt);
+}
+
+/* Resizable table columns (attached to every <th> by useResizableTables) */
+.kp-col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 4;
+  user-select: none;
+  touch-action: none;
+}
+.kp-col-resizer::after {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 22%;
+  height: 56%;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--kp-border-strong);
+  opacity: 0.55;
+}
+th:hover .kp-col-resizer::after {
+  opacity: 1;
+  background: var(--kp-accent);
+}
+.kp-col-resizer:hover::after {
+  opacity: 1;
+  width: 3px;
+  background: var(--kp-accent);
+}
+body.kp-col-resizing,
+body.kp-col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* Fixed backscan options (Scan page): native radio group, five presets.
+   Native inputs are used deliberately — Fluent Dropdown previously caused
+   a full-page crash, and radios need no portal/popover.
+   The row sits OUTSIDE the auto-fit grid: a single 180px grid column wraps
+   the five presets onto two rows, while a grid-column span on a Fluent Field
+   mis-places it and overlaps the Topic combobox. */
+.kp-last-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+.kp-last-row__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kp-text-secondary);
+  white-space: nowrap;
+}
+.kp-last-radios {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  min-height: 32px;
+  padding: 3px 4px;
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius);
+  background: var(--kp-bg);
+}
+.kp-last-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--kp-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.kp-last-radio:hover {
+  background: var(--kp-bg-alt);
+  color: var(--kp-text);
+}
+.kp-last-radio.is-checked {
+  border-color: var(--kp-accent);
+  background: var(--kp-bg-alt);
+  color: var(--kp-accent);
+  font-weight: 600;
+}
+.kp-last-radio input {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  accent-color: var(--kp-accent);
+  cursor: pointer;
+}
+.kp-last-radio input:focus-visible {
+  outline: 2px solid var(--kp-accent);
+  outline-offset: 2px;
+}
+.kp-last-warning {
+  color: var(--kp-warning) !important;
+  font-size: 12px;
+}
+
+/* Script batch editor + inline call-rule card (Produce page, FR-07).
+   The editor is a plain textarea on purpose: users paste or edit JS directly,
+   no file picker and no client-side path handling. */
+.kp-code-editor {
+  display: block;
+  width: 100%;
+  min-height: 230px;
+  margin-top: 8px;
+  padding: 12px 14px;
+  font-family: var(--kp-font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--kp-text);
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  resize: vertical;
+  white-space: pre;
+  overflow: auto;
+  tab-size: 2;
+}
+.kp-code-editor:focus-visible {
+  outline: 2px solid var(--kp-accent);
+  outline-offset: 1px;
+}
+.kp-code-editor::placeholder {
+  color: var(--kp-text-tertiary);
+}
+.kp-script-rules {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border);
+  border-left: 3px solid var(--kp-accent);
+  border-radius: var(--kp-radius);
+}
+.kp-script-rules__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kp-text);
+  margin-bottom: 10px;
+}
+.kp-script-rules__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px 20px;
+}
+.kp-script-rules__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.kp-script-rules__item b {
+  font-weight: 600;
+  color: var(--kp-text);
+}
+.kp-script-rules__item span {
+  color: var(--kp-text-secondary);
+}
+.kp-script-rules__formula {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--kp-border);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--kp-text-secondary);
+}
+.kp-script-rules__formula b {
+  color: var(--kp-accent);
+  font-weight: 600;
+}
+
+/* Produce page: let the main pane scroll instead of clipping the card.
+   Fluent UI Card defaults to overflow:hidden and .kp-fill pins height:100%,
+   which together used to clip ~1250px of content with no scrollbar. */
+.kp-fill--produce {
+  height: auto;
+  min-height: 100%;
+}
+.kp-fill--scan {
+  height: auto;
+  min-height: 100%;
+}
+.kp-card.kp-card--batch {
+  /* Fluent injects its own overflow:hidden class at runtime; override it so
+     the sticky action bar can stick to the scrolling main pane. */
+  overflow: visible !important;
+}
+
+/* Batch actions stay reachable while reading the long reference cards. */
+.kp-batch-actions {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-top: 12px;
+  padding: 10px 0;
+  background: var(--kp-bg);
+  border-top: 1px solid var(--kp-border);
+  border-bottom: 1px solid var(--kp-border);
+}
+.kp-reference-divider {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--kp-border-strong);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kp-text-tertiary);
+}
+
+/* ctx API quick reference (script batch produce page) */
+.kp-ctx-panel {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: var(--kp-bg);
+  border: 1px solid var(--kp-border);
+  border-left: 3px solid var(--kp-success);
+  border-radius: var(--kp-radius);
+}
+.kp-ctx-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.kp-ctx-panel__heading {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+.kp-ctx-panel__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kp-text);
+}
+.kp-ctx-panel__sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--kp-text-secondary);
+}
+.kp-ctx-panel__actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.kp-ctx-panel__brief {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--kp-text-secondary);
+}
+.kp-ctx-panel__brief-tip {
+  color: var(--kp-text-tertiary);
+}
+.kp-ctx-panel code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border);
+  font-family: var(--kp-font-mono);
+  font-size: 11.5px;
+  color: var(--kp-text);
+  overflow-wrap: anywhere;
+}
+.kp-ctx-code {
+  white-space: pre-wrap;
+}
+.kp-ctx-type {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: #eef5fc;
+  color: var(--kp-accent);
+  font-family: var(--kp-font-mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.kp-ctx-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.kp-ctx-table th,
+.kp-ctx-table td {
+  padding: 7px 18px 7px 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--kp-border);
+  color: var(--kp-text-secondary);
+  overflow-wrap: anywhere;
+}
+.kp-ctx-table th {
+  background: var(--kp-bg-alt);
+  color: var(--kp-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kp-ctx-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.kp-ctx-table th:first-child {
+  min-width: 118px;
+}
+.kp-ctx-table td:first-child {
+  white-space: nowrap;
+}
+.kp-ctx-table td:first-child code {
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+.kp-ctx-panel__foot {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--kp-border);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--kp-text-secondary);
+}
+.kp-ctx-panel__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+.kp-ctx-note {
+  padding: 10px 12px;
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius);
+}
+.kp-ctx-note__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kp-text);
+  margin-bottom: 6px;
+}
+.kp-ctx-note ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--kp-text-secondary);
+}
+.kp-ctx-note li + li {
+  margin-top: 4px;
+}
+.kp-ctx-panel__section-title {
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kp-text);
+}
+.kp-ctx-recipes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.kp-ctx-recipe {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius);
+  font-size: 12px;
+}
+.kp-ctx-recipe__title {
+  font-weight: 600;
+  color: var(--kp-text);
+}
+.kp-ctx-recipe__desc {
+  line-height: 1.6;
+  color: var(--kp-text-secondary);
+}
+.kp-ctx-recipe__code {
+  display: block;
+  width: 100%;
+  padding: 6px 8px !important;
+  background: var(--kp-bg) !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+@media (max-width: 720px) {
+  .kp-ctx-table td:first-child,
+  .kp-ctx-table td:first-child code {
+    white-space: normal;
+  }
+}
+
+/* Result-set partition filter (scan results: all partitions are returned) */
+.kp-result-pfilter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius);
+  background: var(--kp-bg-alt);
+}
+.kp-result-pfilter__label {
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--kp-text-secondary);
+  white-space: nowrap;
+}
+.kp-result-pfilter__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--kp-bg);
+  color: var(--kp-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.kp-result-pfilter__chip:hover {
+  border-color: var(--kp-accent);
+  color: var(--kp-accent);
+}
+.kp-result-pfilter__chip.is-active {
+  border-color: var(--kp-accent);
+  background: var(--kp-bg-alt);
+  color: var(--kp-accent);
+  font-weight: 600;
+}
+.kp-result-pfilter__hint {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+/* Explicit key-location switch on the scan page (FR-05).
+   Off by default; the risk card is deliberately always visible when on. */
+.kp-keyloc {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius);
+  background: var(--kp-bg-alt);
+}
+.kp-keyloc__row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.kp-keyloc__hint {
+  font-size: 12px;
+  color: var(--kp-text-secondary);
+  word-break: break-all;
+}
+.kp-keyloc__status,
+.kp-keyloc__error {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.kp-keyloc__error {
+  color: var(--kp-warning);
+}
+.kp-keyloc__result {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--kp-text-secondary);
+}
+.kp-keyloc__badge {
+  padding: 3px 10px;
+  border: 1px solid var(--kp-accent);
+  border-radius: 999px;
+  background: var(--kp-bg);
+  color: var(--kp-accent);
+  font-family: var(--kp-font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kp-keyloc__algo {
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--kp-border);
+  border-radius: 4px;
+  background: var(--kp-bg);
+  font-family: var(--kp-font-mono);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+.kp-keyloc__risk {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--kp-warning);
+  border-radius: 4px;
+  background: var(--kp-bg);
+  color: var(--kp-text-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+.kp-keyloc__risk-title {
+  margin-bottom: 2px;
+  color: var(--kp-warning);
+  font-weight: 600;
+}
+.kp-keyloc__risk ol {
+  margin: 4px 0 4px 18px;
+  padding: 0;
+}
+.kp-keyloc__risk li {
+  margin: 2px 0;
+}
+/* While the switch is on, the partition picker is display-only. */
+.kp-keyloc__locked {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.kp-keyloc__scanned {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--kp-border);
+  border-radius: 4px;
+  background: var(--kp-bg-alt);
+  color: var(--kp-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.kp-keyloc__scanned b {
+  color: var(--kp-warning);
+}
+

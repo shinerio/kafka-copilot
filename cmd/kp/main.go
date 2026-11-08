@@ -17,11 +17,11 @@ import (
 
 var (
 	// Global flags
-	flagProfile  string
-	flagSession  string
-	flagIntent   string
-	flagFormat   string
-	flagApp      *app.App
+	flagProfile string
+	flagSession string
+	flagIntent  string
+	flagFormat  string
+	flagApp     *app.App
 )
 
 func main() {
@@ -63,6 +63,8 @@ func main() {
 		newSchemaCmd(),
 		newServeCmd(),
 		newDesktopCmd(),
+		newStopCmd(),
+		newRestartCmd(),
 	)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -148,14 +150,14 @@ func profileListCmd() *cobra.Command {
 
 func profileAddCmd() *cobra.Command {
 	var (
-		name           string
-		bootstrap      string
-		saslMechanism  string
-		saslUsername   string
-		saslPassword   string
-		tlsEnabled     bool
-		tlsCA          string
-		tlsSkipVerify  bool
+		name          string
+		bootstrap     string
+		saslMechanism string
+		saslUsername  string
+		saslPassword  string
+		tlsEnabled    bool
+		tlsCA         string
+		tlsSkipVerify bool
 	)
 	c := &cobra.Command{
 		Use:   "add",
@@ -355,20 +357,21 @@ func groupLagCmd() *cobra.Command {
 
 func newScanCmd() *cobra.Command {
 	var (
-		topic       string
-		partitions  string
-		last        int
-		since       string
-		until       string
-		offsetFrom  int64
-		offsetTo    int64
-		key         string
-		keyRegex    string
-		keyword     string
-		ignoreCase  bool
-		expr        string
-		timeoutSec  int
-		outputFile  string
+		topic        string
+		partitions   string
+		last         int
+		since        string
+		until        string
+		offsetFrom   int64
+		offsetTo     int64
+		key          string
+		keyRegex     string
+		keyPartition bool
+		keyword      string
+		ignoreCase   bool
+		expr         string
+		timeoutSec   int
+		outputFile   string
 	)
 	c := &cobra.Command{
 		Use:   "scan",
@@ -382,9 +385,10 @@ func newScanCmd() *cobra.Command {
 			opCtx := newOpCtx(cmdStr)
 
 			req := &app.ScanRequest{
-				Profile: flagProfile,
-				Topic:   topic,
-				Last:    last,
+				Profile:      flagProfile,
+				Topic:        topic,
+				Last:         last,
+				KeyPartition: keyPartition,
 			}
 
 			if partitions != "" {
@@ -453,13 +457,14 @@ func newScanCmd() *cobra.Command {
 	}
 	c.Flags().StringVar(&topic, "topic", "", "topic to scan (required)")
 	c.Flags().StringVar(&partitions, "partition", "", "partitions to scan (comma-separated, e.g. 0,2)")
-	c.Flags().IntVar(&last, "last", 100, "backscan count (回扫量语义, max 5000)")
+	c.Flags().IntVar(&last, "last", 100, "backscan count (回扫量语义, max 10000; Web UI 固定 100/500/1000/5000/10000 五档)")
 	c.Flags().StringVar(&since, "since", "", "time window start (RFC3339)")
 	c.Flags().StringVar(&until, "until", "", "time window end (RFC3339)")
 	c.Flags().Int64Var(&offsetFrom, "offset-from", 0, "exact offset range start")
 	c.Flags().Int64Var(&offsetTo, "offset-to", 0, "exact offset range end")
 	c.Flags().StringVar(&key, "key", "", "exact key filter")
 	c.Flags().StringVar(&keyRegex, "key-regex", "", "regex key filter")
+	c.Flags().BoolVar(&keyPartition, "key-partition", false, "EXPERIMENTAL: scan only the partition derived from --key via murmur2 (may silently miss data; requires exact --key, incompatible with --key-regex)")
 	c.Flags().StringVar(&keyword, "keyword", "", "value keyword filter (substring)")
 	c.Flags().BoolVar(&ignoreCase, "ignore-case", true, "case-insensitive keyword (default true)")
 	c.Flags().StringVar(&expr, "expr", "", "jq expression filter")
@@ -478,7 +483,6 @@ func newProduceCmd() *cobra.Command {
 		valueFile   string
 		keyFile     string
 		headers     []string
-		partition   int32
 		script      string
 		count       int
 		concurrency int
@@ -515,7 +519,7 @@ func newProduceCmd() *cobra.Command {
 				return nil
 			}
 
-			// Single mode
+			// Single mode: key is mandatory; the partition is derived from it.
 			var keyBytes, valueBytes []byte
 			if keyFile != "" {
 				data, err := os.ReadFile(keyFile)
@@ -525,6 +529,9 @@ func newProduceCmd() *cobra.Command {
 				keyBytes = data
 			} else if key != "" {
 				keyBytes = []byte(key)
+			}
+			if len(keyBytes) == 0 {
+				return fmt.Errorf("--key or --key-file is required (partition is derived from the key)")
 			}
 
 			if valueFile != "" {
@@ -539,7 +546,7 @@ func newProduceCmd() *cobra.Command {
 				return fmt.Errorf("--value or --value-file is required (for single produce)")
 			}
 
-			result, err := flagApp.ProduceSingle(context.Background(), opCtx, flagProfile, topic, keyBytes, valueBytes, headers, partition)
+			result, err := flagApp.ProduceSingle(context.Background(), opCtx, flagProfile, topic, keyBytes, valueBytes, headers)
 			if err != nil {
 				handleErr(err)
 				return nil
@@ -549,14 +556,13 @@ func newProduceCmd() *cobra.Command {
 		},
 	}
 	c.Flags().StringVar(&topic, "topic", "", "target topic (required)")
-	c.Flags().StringVar(&key, "key", "", "message key")
+	c.Flags().StringVar(&key, "key", "", "message key (required for single produce)")
 	c.Flags().StringVar(&value, "value", "", "message value")
 	c.Flags().StringVar(&valueFile, "value-file", "", "read value from file")
 	c.Flags().StringVar(&keyFile, "key-file", "", "read key from file")
 	c.Flags().StringArrayVar(&headers, "header", nil, "header key=value (repeatable)")
-	c.Flags().Int32Var(&partition, "partition", -1, "target partition (-1 = auto)")
 	c.Flags().StringVar(&script, "script", "", "JS script file for batch produce")
-	c.Flags().IntVar(&count, "count", 0, "total messages for batch")
+	c.Flags().IntVar(&count, "count", 100, "total messages for batch (default 100)")
 	c.Flags().IntVar(&concurrency, "concurrency", 8, "concurrency for batch (1-32)")
 	c.Flags().IntVar(&rate, "rate", 0, "rate limit msgs/sec (0=unlimited)")
 	c.Flags().BoolVar(&dryRun, "dry-run", false, "preview without sending")
@@ -736,11 +742,11 @@ func newSchemaCmd() *cobra.Command {
 					"session", "audit", "schema", "serve", "desktop",
 				},
 				"exit_codes": map[string]int{
-					"ok":         0,
+					"ok":          0,
 					"param_error": 2,
 					"conn_error":  3,
-					"timeout":    4,
-					"internal":   5,
+					"timeout":     4,
+					"internal":    5,
 				},
 			}
 			output(schema)

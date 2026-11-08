@@ -8,8 +8,6 @@ import {
   Input,
   Field,
   Button,
-  Dropdown,
-  Option,
   Switch,
   Table,
   TableHeader,
@@ -36,6 +34,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api } from '../api'
 import type { Profile, ProfileInput, SASL, TLS } from '../types'
 import { EmptyState, ErrorState, JsonView } from '../components/ui'
+import { SelectBox } from '../components/controls'
 
 const useStyles = makeStyles({
   formGrid: {
@@ -353,15 +352,17 @@ export function SettingsPage({
         {form.saslEnabled && (
           <div className={styles.formGrid} style={{ marginTop: 8 }}>
             <Field label="SASL Mechanism">
-              <Dropdown
+              {/* Native select: Fluent Dropdown popup crashed the page on click. */}
+              <SelectBox
+                ariaLabel="SASL Mechanism"
                 value={form.saslMechanism}
-                selectedOptions={[form.saslMechanism]}
-                onOptionSelect={(_, d) => set('saslMechanism', String(d.optionValue))}
-              >
-                <Option value="plain">plain</Option>
-                <Option value="scram-sha-256">scram-sha-256</Option>
-                <Option value="scram-sha-512">scram-sha-512</Option>
-              </Dropdown>
+                onChange={(v) => set('saslMechanism', v)}
+                options={[
+                  { value: 'plain', label: 'plain' },
+                  { value: 'scram-sha-256', label: 'scram-sha-256' },
+                  { value: 'scram-sha-512', label: 'scram-sha-512' },
+                ]}
+              />
             </Field>
             <Field label="Username">
               <Input value={form.saslUsername} onChange={(_, d) => set('saslUsername', d.value)} />

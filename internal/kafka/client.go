@@ -95,23 +95,40 @@ func (p *Pool) Get(profile *config.Profile) (*Client, error) {
 	return c, nil
 }
 
+// Invalidate drops the cached client for a profile so the next Get rebuilds
+// it from fresh configuration. This matters whenever a profile's SASL/TLS
+// settings change at runtime: without it, the connection pool keeps handing
+// out the old (pre-change) client and the new credentials never take effect
+// (a classic "I edited the profile but it still fails" trap). In-flight
+// operations keep their own references; only future Gets are affected.
+func (p *Pool) Invalidate(name string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if c, ok := p.clients[name]; ok {
+		c.Close()
+		delete(p.clients, name)
+	}
+}
+
 // Close closes all clients in the pool.
 func (p *Pool) Close() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for _, c := range p.clients {
-		c.kgoClient.Close()
+		c.Close()
 	}
 	p.clients = make(map[string]*Client)
 }
 
+// newClient creates a client with franz-go's native partitioning: keyed
+// records are consistently hashed by key, keyless records are spread evenly.
+// Producers never pin a partition explicitly (product decision).
 func newClient(profile *config.Profile) (*Client, error) {
 	opts := []kgo.Opt{
 		kgo.SeedBrokers(profile.BootstrapServers...),
 		kgo.ClientID("kafka-pilot"),
 	}
 
-	// SASL
 	if profile.SASL != nil && profile.SASL.Mechanism != "" {
 		saslOpt, err := buildSASL(profile.SASL)
 		if err != nil {
@@ -119,8 +136,6 @@ func newClient(profile *config.Profile) (*Client, error) {
 		}
 		opts = append(opts, saslOpt)
 	}
-
-	// TLS
 	if profile.TLS != nil {
 		tlsCfg, err := buildTLSConfig(profile.TLS)
 		if err != nil {
@@ -133,15 +148,12 @@ func newClient(profile *config.Profile) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create kafka client: %w", err)
 	}
-
-	// Verify connection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := cl.Ping(ctx); err != nil {
 		cl.Close()
 		return nil, classifyConnError(err, profile)
 	}
-
 	return &Client{kgoClient: cl, profile: profile}, nil
 }
 
@@ -191,6 +203,27 @@ func buildTLSConfig(tlsCfg *config.TLS) (*tls.Config, error) {
 // classifyConnError classifies connection errors for layered diagnostics (FR-13 rule 8).
 func classifyConnError(err error, profile *config.Profile) error {
 	errStr := strings.ToLower(err.Error())
+
+	// franz-go reports "broker closed the connection immediately after a
+	// request was issued" when the connection is dropped right after connect.
+	// Its guess is "SASL missing", but the real cause is almost always one of:
+	//   (a) broker listener is SASL_SSL but the client has no tls block,
+	//   (b) wrong listener port (PLAINTEXT 9092 vs SSL 9093),
+	//   (c) missing/wrong SASL mechanism or credentials.
+	// Surface all of these instead of a misleading "auth failed".
+	if strings.Contains(errStr, "closed the connection immediately") ||
+		strings.Contains(errStr, "sasl is required but not provided") {
+		mech, tlsCfg := "", false
+		if profile.SASL != nil {
+			mech = profile.SASL.Mechanism
+		}
+		if profile.TLS != nil {
+			tlsCfg = true
+		}
+		return fmt.Errorf("connection dropped immediately after connect: if the broker listener is SASL_SSL you must also configure a tls block; verify mechanism=%q matches the broker and that the port matches the listener type (PLAINTEXT vs SSL); tls_configured=%v: %w",
+			mech, tlsCfg, err)
+	}
+
 	if isSASLError(errStr) {
 		mech := ""
 		if profile.SASL != nil {

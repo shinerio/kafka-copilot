@@ -29,21 +29,21 @@ type Op struct {
 
 // Session represents a session record.
 type Session struct {
-	SessionID  string `json:"session_id"`
-	Label      string `json:"label,omitempty"`
-	StartedAt  int64  `json:"started_at"`
-	EndedAt    int64  `json:"ended_at,omitempty"`
-	OpCount    int    `json:"op_count"`
-	Auto       bool   `json:"auto,omitempty"`
+	SessionID string `json:"session_id"`
+	Label     string `json:"label,omitempty"`
+	StartedAt int64  `json:"started_at"`
+	EndedAt   int64  `json:"ended_at,omitempty"`
+	OpCount   int    `json:"op_count"`
+	Auto      bool   `json:"auto,omitempty"`
 }
 
 // Snapshot holds bounded scan hit messages for local replay.
 type Snapshot struct {
-	OpID       string          `json:"op_id"`
-	SessionID  string          `json:"session_id,omitempty"`
-	CreatedAt  int64           `json:"created_at"`
-	Messages   json.RawMessage `json:"messages"`
-	Truncated  bool            `json:"truncated"`
+	OpID      string          `json:"op_id"`
+	SessionID string          `json:"session_id,omitempty"`
+	CreatedAt int64           `json:"created_at"`
+	Messages  json.RawMessage `json:"messages"`
+	Truncated bool            `json:"truncated"`
 }
 
 // Store manages audit data in SQLite.
@@ -313,6 +313,113 @@ func (s *Store) GetSession(sessionID string) (*Session, error) {
 	sess.EndedAt = endedAt.Int64
 	sess.Auto = auto == 1
 	return &sess, nil
+}
+
+func placeholders(n int) string {
+	q := ""
+	for i := 0; i < n; i++ {
+		if i > 0 {
+			q += ","
+		}
+		q += "?"
+	}
+	return q
+}
+
+func toAnySlice(ss []string) []interface{} {
+	out := make([]interface{}, len(ss))
+	for i, v := range ss {
+		out[i] = v
+	}
+	return out
+}
+
+// DeleteOps removes selected operations and their snapshots inside one
+// transaction, then recalculates op_count for every affected session.
+func (s *Store) DeleteOps(opIDs []string) (int64, error) {
+	if len(opIDs) == 0 {
+		return 0, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	ph := placeholders(len(opIDs))
+	args := toAnySlice(opIDs)
+
+	// Collect affected sessions before deleting.
+	rows, err := tx.Query(
+		`SELECT DISTINCT session_id FROM operations WHERE op_id IN (`+ph+`)
+		 AND session_id IS NOT NULL AND session_id <> ''`, args...)
+	if err != nil {
+		return 0, err
+	}
+	var sessions []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			sessions = append(sessions, id)
+		}
+	}
+	rows.Close()
+
+	if _, err := tx.Exec(`DELETE FROM snapshots WHERE op_id IN (`+ph+`)`, args...); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`DELETE FROM operations WHERE op_id IN (`+ph+`)`, args...)
+	if err != nil {
+		return 0, err
+	}
+	deleted, _ := res.RowsAffected()
+
+	for _, sid := range sessions {
+		if _, err := tx.Exec(
+			`UPDATE sessions SET op_count = (SELECT COUNT(*) FROM operations WHERE session_id = ?)
+			 WHERE session_id = ?`, sid, sid); err != nil {
+			return 0, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return deleted, nil
+}
+
+// DeleteSessions removes selected sessions together with all their ops and
+// snapshots, inside one transaction.
+func (s *Store) DeleteSessions(sessionIDs []string) (int64, error) {
+	if len(sessionIDs) == 0 {
+		return 0, nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	ph := placeholders(len(sessionIDs))
+	args := toAnySlice(sessionIDs)
+
+	if _, err := tx.Exec(
+		`DELETE FROM snapshots WHERE session_id IN (`+ph+`)
+		 OR op_id IN (SELECT op_id FROM operations WHERE session_id IN (`+ph+`))`,
+		append(append([]interface{}{}, args...), args...)...); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(`DELETE FROM operations WHERE session_id IN (`+ph+`)`, args...); err != nil {
+		return 0, err
+	}
+	res, err := tx.Exec(`DELETE FROM sessions WHERE session_id IN (`+ph+`)`, args...)
+	if err != nil {
+		return 0, err
+	}
+	deleted, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return deleted, nil
 }
 
 // ClearAudit clears audit data optionally before a timestamp (FR-09 rule 6).

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,8 +32,8 @@ type Server struct {
 // NewServer creates a new Server wired to the given App.
 func NewServer(a *app.App) *Server {
 	s := &Server{
-		app:  a,
-		mux:  http.NewServeMux(),
+		app: a,
+		mux: http.NewServeMux(),
 	}
 	s.distRoot, _ = fs.Sub(distFS, "dist")
 	s.fileServer = http.FileServer(http.FS(s.distRoot))
@@ -62,6 +64,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("GET /api/topics/{topic}", s.handleDescribeTopic)
 
 	// Scan & Produce
+	// Read-only helper: compute which partition a standard producer would pick
+	// for an exact key. Used by the Web UI to show the hint BEFORE scanning.
+	s.mux.HandleFunc("GET /api/key-partition", s.handleKeyPartition)
 	s.mux.HandleFunc("POST /api/scan", s.handleScan)
 	s.mux.HandleFunc("POST /api/produce", s.handleProduce)
 	s.mux.HandleFunc("POST /api/produce/batch", s.handleProduceBatch)
@@ -73,9 +78,11 @@ func (s *Server) registerRoutes() {
 	// Sessions
 	s.mux.HandleFunc("GET /api/sessions", s.handleListSessions)
 	s.mux.HandleFunc("GET /api/sessions/{id}", s.handleGetSession)
+	s.mux.HandleFunc("DELETE /api/sessions", s.handleDeleteSessions)
 
 	// Audit
 	s.mux.HandleFunc("GET /api/audit/ops", s.handleListOps)
+	s.mux.HandleFunc("DELETE /api/audit/ops", s.handleDeleteOps)
 	s.mux.HandleFunc("GET /api/audit/ops/{op_id}", s.handleGetOp)
 	s.mux.HandleFunc("GET /api/audit/ops/{op_id}/snapshot", s.handleGetSnapshot)
 	s.mux.HandleFunc("GET /api/audit/stream", s.handleAuditStream)
@@ -90,6 +97,14 @@ func (s *Server) registerRoutes() {
 // =============================================================================
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+	// Normalize nil slices to [] so list endpoints always return a JSON array
+	// (Go encodes a nil slice as null, which breaks Array.isArray on the UI).
+	if v != nil {
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Slice && rv.IsNil() {
+			v = reflect.MakeSlice(rv.Type(), 0, 0).Interface()
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
@@ -129,17 +144,44 @@ func writeAppError(w http.ResponseWriter, err error) {
 	writeAPIError(w, hs, code, err.Error(), hint)
 }
 
-// parseTimeParam accepts Unix millis (int) or RFC3339 string.
-func parseTimeParam(s string) (int64, error) {
+// parseFlexibleTime accepts several timestamp shapes so the UI (native
+// datetime-local) and CLI users are not forced into one exact spelling:
+//   - Unix millis (numeric string)
+//   - RFC3339 / RFC3339Nano with "+08:00" or "Z"
+//   - compact offset "+0800" (legacy UI builds emitted this)
+//   - zone-less local wall time "2026-11-07T19:23:00", "...T19:23",
+//     "2026-11-07 19:23:00", "2026-11-07"
+func parseFlexibleTime(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, nil
+		return time.Time{}, fmt.Errorf("empty time")
 	}
 	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return n, nil
+		return time.UnixMilli(n), nil
 	}
-	t, err := time.Parse(time.RFC3339, s)
+	zoned := []string{time.RFC3339Nano, time.RFC3339, "2006-01-02T15:04:05Z0700", "2006-01-02T15:04:05.999999999Z0700"}
+	for _, layout := range zoned {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t, nil
+		}
+	}
+	local := []string{"2006-01-02T15:04:05", "2006-01-02T15:04", "2006-01-02 15:04:05", "2006-01-02 15:04", "2006-01-02"}
+	for _, layout := range local {
+		if t, err := time.ParseInLocation(layout, s, time.Local); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid time (use RFC3339 or local datetime): %q", s)
+}
+
+// parseTimeParam returns Unix millis; "" maps to 0 (no filter).
+func parseTimeParam(s string) (int64, error) {
+	if strings.TrimSpace(s) == "" {
+		return 0, nil
+	}
+	t, err := parseFlexibleTime(s)
 	if err != nil {
-		return 0, fmt.Errorf("invalid time (use Unix millis or RFC3339): %w", err)
+		return 0, err
 	}
 	return t.UnixMilli(), nil
 }
@@ -281,21 +323,48 @@ func (s *Server) handleDescribeTopic(w http.ResponseWriter, r *http.Request) {
 }
 
 // =============================================================================
+// Key partition hint (read-only helper for the explicit key-location switch)
+// =============================================================================
+
+func (s *Server) handleKeyPartition(w http.ResponseWriter, r *http.Request) {
+	topic := r.URL.Query().Get("topic")
+	key := r.URL.Query().Get("key")
+	profile := r.URL.Query().Get("profile")
+	if topic == "" || key == "" {
+		writeAPIError(w, http.StatusBadRequest, 2, "topic and key are required", "")
+		return
+	}
+	partition, count, err := s.app.KeyPartitionHint(r.Context(), profile, topic, key)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"topic":           topic,
+		"key":             key,
+		"partition":       partition,
+		"partition_count": count,
+		"algorithm":       "murmur2(key) & 0x7fffffff % partition_count",
+	})
+}
+
+// =============================================================================
 // Scan
 // =============================================================================
 
 type scanRequest struct {
-	Profile    string  `json:"profile,omitempty"`
-	Topic      string  `json:"topic"`
-	Last       int     `json:"last,omitempty"`
-	Since      string  `json:"since,omitempty"`
-	Until      string  `json:"until,omitempty"`
-	Key        string  `json:"key,omitempty"`
-	KeyRegex   string  `json:"key_regex,omitempty"`
-	Keyword    string  `json:"keyword,omitempty"`
-	Expr       string  `json:"expr,omitempty"`
-	Partitions []int32 `json:"partitions,omitempty"`
-	Timeout    int     `json:"timeout,omitempty"`
+	Profile      string  `json:"profile,omitempty"`
+	Topic        string  `json:"topic"`
+	Last         int     `json:"last,omitempty"`
+	Since        string  `json:"since,omitempty"`
+	Until        string  `json:"until,omitempty"`
+	Key          string  `json:"key,omitempty"`
+	KeyRegex     string  `json:"key_regex,omitempty"`
+	Keyword      string  `json:"keyword,omitempty"`
+	Expr         string  `json:"expr,omitempty"`
+	Partitions   []int32 `json:"partitions,omitempty"`
+	KeyPartition bool    `json:"key_partition,omitempty"`
+	Timeout      int     `json:"timeout,omitempty"`
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
@@ -310,31 +379,32 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := &app.ScanRequest{
-		Profile:    body.Profile,
-		Topic:      body.Topic,
-		Last:       body.Last,
-		Key:        body.Key,
-		KeyRegex:   body.KeyRegex,
-		Keyword:    body.Keyword,
-		Expr:       body.Expr,
-		Partitions: body.Partitions,
-		TimeoutSec: body.Timeout,
-		IgnoreCase: true,
+		Profile:      body.Profile,
+		Topic:        body.Topic,
+		Last:         body.Last,
+		Key:          body.Key,
+		KeyRegex:     body.KeyRegex,
+		Keyword:      body.Keyword,
+		Expr:         body.Expr,
+		Partitions:   body.Partitions,
+		KeyPartition: body.KeyPartition,
+		TimeoutSec:   body.Timeout,
+		IgnoreCase:   true,
 	}
 
 	if body.Since != "" {
-		t, err := time.Parse(time.RFC3339, body.Since)
+		t, err := parseFlexibleTime(body.Since)
 		if err != nil {
-			writeAPIError(w, http.StatusBadRequest, 2, "invalid since format (use RFC3339): "+err.Error(), "")
+			writeAPIError(w, http.StatusBadRequest, 2, "invalid since format: "+err.Error(), "")
 			return
 		}
 		req.Since = t
 		req.HasTimeWindow = true
 	}
 	if body.Until != "" {
-		t, err := time.Parse(time.RFC3339, body.Until)
+		t, err := parseFlexibleTime(body.Until)
 		if err != nil {
-			writeAPIError(w, http.StatusBadRequest, 2, "invalid until format (use RFC3339): "+err.Error(), "")
+			writeAPIError(w, http.StatusBadRequest, 2, "invalid until format: "+err.Error(), "")
 			return
 		}
 		req.Until = t
@@ -349,6 +419,9 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 	command := fmt.Sprintf("HTTP scan topic=%s", body.Topic)
 	if body.Key != "" {
 		command += " key=" + body.Key
+	}
+	if body.KeyPartition {
+		command += " key-partition=true"
 	}
 	if body.Keyword != "" {
 		command += " keyword=" + body.Keyword
@@ -368,12 +441,62 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 // =============================================================================
 
 type produceRequest struct {
-	Profile   string   `json:"profile,omitempty"`
-	Topic     string   `json:"topic"`
-	Key       string   `json:"key,omitempty"`
-	Value     string   `json:"value"`
-	Headers   []string `json:"headers,omitempty"`
-	Partition *int32   `json:"partition,omitempty"`
+	Profile string          `json:"profile,omitempty"`
+	Topic   string          `json:"topic"`
+	Key     string          `json:"key"`
+	Value   string          `json:"value"`
+	Headers json.RawMessage `json:"headers,omitempty"`
+}
+
+// parseProduceHeaders normalizes the two header shapes our clients send into
+// the "k=v" []string form consumed by app.ProduceSingle / produce.ParseHeaders:
+//   - object: {"traceId":"abc","source":"ui"}  — Web UI (preferred, no '=' ambiguity)
+//   - array:  ["traceId=abc","source=ui"]      — CLI-style, kept for compatibility
+//
+// A typed []string field used to reject the UI's object with
+// "cannot unmarshal object into Go struct field ... of type []string".
+func parseProduceHeaders(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 || strings.TrimSpace(string(raw)) == "null" {
+		return nil, nil
+	}
+
+	if strings.HasPrefix(strings.TrimSpace(string(raw)), "{") {
+		var obj map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &obj); err != nil {
+			return nil, fmt.Errorf("headers object is invalid: %w", err)
+		}
+		keys := make([]string, 0, len(obj))
+		for k := range obj {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys) // deterministic header order
+
+		out := make([]string, 0, len(keys))
+		for _, k := range keys {
+			if k == "" {
+				return nil, fmt.Errorf("header name must not be empty")
+			}
+			if strings.Contains(k, "=") {
+				return nil, fmt.Errorf("header name %q must not contain '='", k)
+			}
+			var v string
+			if err := json.Unmarshal(obj[k], &v); err != nil {
+				// Numbers / booleans / null are accepted as their JSON text.
+				v = string(obj[k])
+				if v == "null" {
+					v = ""
+				}
+			}
+			out = append(out, k+"="+v)
+		}
+		return out, nil
+	}
+
+	var arr []string
+	if err := json.Unmarshal(raw, &arr); err != nil {
+		return nil, fmt.Errorf("headers must be an object {\"k\":\"v\"} or an array [\"k=v\"]")
+	}
+	return arr, nil
 }
 
 func (s *Server) handleProduce(w http.ResponseWriter, r *http.Request) {
@@ -390,17 +513,23 @@ func (s *Server) handleProduce(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, 2, "value is required", "")
 		return
 	}
-
-	partition := int32(-1) // auto
-	if body.Partition != nil {
-		partition = *body.Partition
+	if body.Key == "" {
+		writeAPIError(w, http.StatusBadRequest, 2, "key is required",
+			"the target partition is derived from the key")
+		return
+	}
+	headers, err := parseProduceHeaders(body.Headers)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, 2, err.Error(),
+			"send headers as an object {\"name\":\"value\"} or an array [\"name=value\"]")
+		return
 	}
 
-	command := fmt.Sprintf("HTTP produce topic=%s", body.Topic)
+	command := fmt.Sprintf("HTTP produce topic=%s key=%s", body.Topic, body.Key)
 	opCtx := s.app.NewOpContext("", "human", app.GetActor(), "", command)
 
 	result, err := s.app.ProduceSingle(r.Context(), opCtx, body.Profile, body.Topic,
-		[]byte(body.Key), []byte(body.Value), body.Headers, partition)
+		[]byte(body.Key), []byte(body.Value), headers)
 	if err != nil {
 		writeAppError(w, err)
 		return
@@ -409,13 +538,17 @@ func (s *Server) handleProduce(w http.ResponseWriter, r *http.Request) {
 }
 
 type batchProduceRequest struct {
-	Profile     string `json:"profile,omitempty"`
-	Topic       string `json:"topic"`
-	Script      string `json:"script"`
-	Count       int    `json:"count"`
-	Concurrency int    `json:"concurrency,omitempty"`
-	Rate        int    `json:"rate,omitempty"`
-	DryRun      bool   `json:"dry_run,omitempty"`
+	Profile string `json:"profile,omitempty"`
+	Topic   string `json:"topic"`
+	// Script is a path to a .js file on the server (CLI-style callers).
+	// ScriptContent is inline JS source, which is what the Web UI sends after
+	// reading a user-selected file with FileReader. Either one is required.
+	Script        string `json:"script,omitempty"`
+	ScriptContent string `json:"script_content,omitempty"`
+	Count         int    `json:"count"`
+	Concurrency   int    `json:"concurrency,omitempty"`
+	Rate          int    `json:"rate,omitempty"`
+	DryRun        bool   `json:"dry_run,omitempty"`
 }
 
 func (s *Server) handleProduceBatch(w http.ResponseWriter, r *http.Request) {
@@ -428,21 +561,26 @@ func (s *Server) handleProduceBatch(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusBadRequest, 2, "topic is required", "")
 		return
 	}
-	if body.Script == "" {
-		writeAPIError(w, http.StatusBadRequest, 2, "script is required", "")
+	if body.Script == "" && body.ScriptContent == "" {
+		writeAPIError(w, http.StatusBadRequest, 2, "script is required",
+			"send inline JS source in script_content, or a server-side file path in script")
 		return
 	}
 
 	req := &produce.BatchRequest{
-		Topic:       body.Topic,
-		ScriptPath:  body.Script,
-		Count:       body.Count,
-		Concurrency: body.Concurrency,
-		Rate:        body.Rate,
-		DryRun:      body.DryRun,
+		Topic:         body.Topic,
+		ScriptPath:    body.Script,
+		ScriptContent: body.ScriptContent,
+		Count:         body.Count,
+		Concurrency:   body.Concurrency,
+		Rate:          body.Rate,
+		DryRun:        body.DryRun,
 	}
 	if req.Concurrency == 0 {
 		req.Concurrency = 8
+	}
+	if req.Count <= 0 {
+		req.Count = 100
 	}
 
 	command := fmt.Sprintf("HTTP produce batch topic=%s count=%d", body.Topic, body.Count)
@@ -568,6 +706,60 @@ func (s *Server) handleClearAudit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "cleared"})
+}
+
+// handleDeleteOps removes explicitly selected audit operations (and their
+// snapshots). Used by the observation page's multi-select delete action.
+func (s *Server) handleDeleteOps(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		OpIDs []string `json:"op_ids"`
+		IDs   []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, http.StatusBadRequest, 2, "invalid JSON body: "+err.Error(), "")
+		return
+	}
+	ids := body.OpIDs
+	if len(ids) == 0 {
+		ids = body.IDs
+	}
+	if len(ids) == 0 {
+		writeAPIError(w, http.StatusBadRequest, 2, "op_ids is required", "select at least one operation")
+		return
+	}
+	n, err := s.app.Audit.DeleteOps(ids)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "deleted", "deleted": n})
+}
+
+// handleDeleteSessions removes selected sessions and all operations/snapshots
+// belonging to them.
+func (s *Server) handleDeleteSessions(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		SessionIDs []string `json:"session_ids"`
+		IDs        []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIError(w, http.StatusBadRequest, 2, "invalid JSON body: "+err.Error(), "")
+		return
+	}
+	ids := body.SessionIDs
+	if len(ids) == 0 {
+		ids = body.IDs
+	}
+	if len(ids) == 0 {
+		writeAPIError(w, http.StatusBadRequest, 2, "session_ids is required", "select at least one session")
+		return
+	}
+	n, err := s.app.Audit.DeleteSessions(ids)
+	if err != nil {
+		writeAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "deleted", "deleted": n})
 }
 
 // handleAuditStream pushes new/changed ops via Server-Sent Events.

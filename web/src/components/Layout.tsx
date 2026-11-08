@@ -3,8 +3,6 @@
 // state lives in App.tsx.
 
 import {
-  Dropdown,
-  Option,
   Toolbar,
   ToolbarButton,
   Tooltip,
@@ -20,11 +18,11 @@ import {
   TabDesktopMultipleRegular,
   BotRegular,
   SettingsRegular,
-  CheckmarkCircleRegular,
   PlugConnectedRegular,
 } from '@fluentui/react-icons'
 import type { ReactNode } from 'react'
 import type { Profile } from '../types'
+import { SelectBox } from './controls'
 
 export type PageKey =
   | 'topics'
@@ -148,31 +146,19 @@ export function Layout({
         <Divider vertical style={{ height: 24 }} />
 
         <Body1 className="kp-muted">Profile</Body1>
-        <Dropdown
-          size="small"
+        {/* Native select: Fluent Dropdown popup crashed the whole tree on click. */}
+        <SelectBox
+          ariaLabel="选择 Profile"
+          value={activeProfile}
+          onChange={onSelectProfile}
+          disabled={profiles.length === 0}
           style={{ minWidth: 180 }}
-          value={activeProfile || '（未选择）'}
-          selectedOptions={[activeProfile]}
-          onOptionSelect={(_, d) => onSelectProfile(d.optionValue as string)}
-        >
-          {profiles.length === 0 ? (
-            <Option text="（无 profile，请在设置中添加）" disabled>
-              （无 profile）
-            </Option>
-          ) : (
-            profiles.map((p) => (
-              <Option key={p.name} value={p.name} text={p.name}>
-                <CheckmarkCircleRegular
-                  style={{
-                    visibility: p.name === activeProfile ? 'visible' : 'hidden',
-                    color: tokens.colorBrandForeground1,
-                  }}
-                />
-                {p.name}
-              </Option>
-            ))
-          )}
-        </Dropdown>
+          options={
+            profiles.length === 0
+              ? [{ value: '', label: '（无 profile，请在设置中添加）', disabled: true }]
+              : profiles.map((p) => ({ value: p.name, label: p.name }))
+          }
+        />
 
         <div className="kp-grow" />
 

@@ -91,6 +91,18 @@ export interface ScanRequestBody {
   keyword?: string
   expr?: string
   partitions?: number[]
+  // Explicit opt-in: narrow the scan to the partition derived from an exact
+  // key. Default is false / omitted (scan every partition).
+  key_partition?: boolean
+}
+
+// Read-only display helper: GET /api/key-partition?topic=&key=
+export interface KeyPartitionInfo {
+  topic: string
+  key: string
+  partition: number
+  partition_count: number
+  algorithm: string
 }
 
 export interface ResultMessage {
@@ -109,26 +121,35 @@ export interface ScanResult {
   topic: string
   total: number
   matched: number
+  // Hits before --last truncation; only present when the result was truncated.
+  matched_raw?: number
   truncated: boolean
   warnings?: string[]
   elapsedMs: number
   messages?: ResultMessage[]
+  partition_ranges?: { partition: number; from_offset: number; to_offset: number }[]
   skippedNonUtf8Key?: number
+  // Present only when the explicit key-location switch was used.
+  key_partition?: number
+  key_partition_count?: number
 }
 
 // --- Produce (internal/produce) ---
 
 export interface ProduceRequestBody {
   topic: string
-  key?: string
+  key: string // required: the partition is derived from the key
   value: string
   headers?: Record<string, string>
-  partition?: number
 }
 
 export interface ProduceBatchRequestBody {
   topic: string
-  script: string
+  // Inline JS source read from the user-selected file. The browser cannot
+  // expose a local filesystem path to the server, so `script` (a server-side
+  // path) is only used by CLI-style API callers.
+  script_content?: string
+  script?: string
   count: number
   concurrency: number
   rate: number
@@ -148,6 +169,10 @@ export interface BatchResult {
   cancelled: boolean
   tps: number
   elapsedMs: number
+  // Generation model: how many times generate(ctx) ran, and how many
+  // records were actually built (before sending / Kafka confirmation).
+  generateCalls?: number
+  messagesBuilt?: number
   dryRun?: boolean
   samples?: Sample[]
 }

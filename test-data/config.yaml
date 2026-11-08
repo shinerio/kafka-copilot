@@ -3,3 +3,7 @@ profiles:
     - name: test
       bootstrap_servers:
         - 192.168.85.2:9092
+      sasl:
+        mechanism: plain
+        username: appuser
+        password: AQAAANCMnd8BFdERjHoAwE/Cl+sBAAAAYKpcvO0FLkaBNrDLJyDAYgAAAAACAAAAAAAQZgAAAAEAACAAAAAU+S/Ilcxe3+c44j4Gr5B9lJ/2TaxZIXIij6/z+y7whQAAAAAOgAAAAAIAACAAAADXuA2SjtUQ0jtIiortZ45lzikjTVBbNJ1jmvSu26HrbRAAAADgZskkBWN86vnQs/uc7Mt/QAAAACBXDblOsjTKZSavFZ3+uzLPUoerJ/R0xDFCw/kqsod1bzG1ee2PMUC4v1oA7qoHIGtmOurBJ1LPbcoZJJfKQKY=

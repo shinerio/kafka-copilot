@@ -13,6 +13,18 @@ import (
 	"kafka-pilot/internal/filter"
 )
 
+// MaxLast is the hard cap for a single backscan. The Web client exposes
+// exactly five radio options (100/500/1000/5000/10000); the CLI still accepts
+// any value up to this cap.
+const MaxLast = 10000
+
+// MaxResultMessages is a safety cap on the total number of hits returned by a
+// single scan. --last N is a PER-PARTITION backscan amount, so a topic with P
+// partitions can legitimately produce P*N hits; all of them are returned so
+// no partition is silently dropped. This cap only guards pathological cases
+// (e.g. 100+ partitions x 10000) from exhausting memory / the HTTP response.
+const MaxResultMessages = 50000
+
 // Request holds scan parameters.
 type Request struct {
 	Topic          string
@@ -40,6 +52,10 @@ type Result struct {
 	Topic             string           `json:"topic"`
 	Total             int              `json:"total"`
 	Matched           int              `json:"matched"`
+	// MatchedRaw is the number of filter hits before a safety-cap truncation.
+	// Only emitted when a truncation actually happened, so the UI can state
+	// exactly how many hits were dropped instead of showing a bare warning code.
+	MatchedRaw        int              `json:"matched_raw,omitempty"`
 	Truncated         bool             `json:"truncated"`
 	Warnings          []string         `json:"warnings,omitempty"`
 	Messages          []*filter.Result `json:"messages"`
@@ -83,7 +99,8 @@ type partState struct {
 //  3. Direct-assign partitions with kgo.AddConsumePartitions (no group, no commits).
 //  4. PollFetches loop, applying offset/time windows and the filter.
 //  5. Cross-partition merge-sort by timestamp desc (tie-break: partition asc, offset asc).
-//  6. Apply --last truncation if matched count exceeds N.
+//  6. Return all hits (per-partition backscan, no global --last truncation),
+//     guarded only by a very high safety cap; flag timeout/cap truncation.
 func (s *Scanner) Scan(ctx context.Context, req *Request, f *filter.Filter) (*Result, error) {
 	start := time.Now()
 
@@ -103,6 +120,35 @@ func (s *Scanner) Scan(ctx context.Context, req *Request, f *filter.Filter) (*Re
 	ranges, err := s.calculateRanges(ctx, req, partIDs)
 	if err != nil {
 		return nil, err
+	}
+
+	// Fast path: no partition has any message in the requested window (a freshly
+	// created empty topic, or a window entirely past the HWM). Entering
+	// PollFetches here would block on the broker's long poll until the scan
+	// timeout for no reason, so return the empty result immediately.
+	hasData := false
+	for _, r := range ranges {
+		if r.endOffset > r.startOffset {
+			hasData = true
+			break
+		}
+	}
+	if !hasData {
+		pr := make([]PartitionRange, 0, len(ranges))
+		for _, r := range ranges {
+			pr = append(pr, PartitionRange{
+				Partition: r.partition,
+				From:      r.startOffset,
+				To:        r.endOffset,
+			})
+		}
+		sort.Slice(pr, func(i, j int) bool { return pr[i].Partition < pr[j].Partition })
+		return &Result{
+			Topic:           req.Topic,
+			Messages:        []*filter.Result{},
+			PartitionRanges: pr,
+			ElapsedMs:       time.Since(start).Milliseconds(),
+		}, nil
 	}
 
 	// 3. Direct-assign partitions at their start offsets.
@@ -238,13 +284,41 @@ pollLoop:
 		return allMessages[i].Offset < allMessages[j].Offset
 	})
 
-	// 6. --last N global truncation: matched count must be <= N.
+	// 6. Result assembly. --last N is a PER-PARTITION backscan amount: the poll
+	// loop already reads at most N raw messages from each partition, so each
+	// partition contributes at most N hits. Do NOT globally truncate to N --
+	// that used to discard whole partitions and produced confusing results such
+	// as "total 1200, matched 100" on a 12-partition topic. Only a very high
+	// safety cap (and timeout below) may truncate.
 	truncated := false
+	matchedRaw := 0
 	warnings := []string{}
-	if req.Last > 0 && len(allMessages) > req.Last {
-		allMessages = allMessages[:req.Last]
+	// FR-05: large backscans are allowed but always flagged in the result.
+	if req.Last > 1000 {
+		warnings = append(warnings, "scan>1000")
+	}
+	if len(allMessages) > MaxResultMessages {
+		matchedRaw = len(allMessages)
+		// Truncate PER PARTITION, not globally. A global time-ordered cut can
+		// erase entire partitions -- exactly the data the user must be able to
+		// inspect. allMessages is already sorted by ts desc, so taking the
+		// first K hits per partition keeps each partition's newest results.
+		perPart := MaxResultMessages / len(partIDs)
+		if perPart < 1 {
+			perPart = 1
+		}
+		kept := make([]*filter.Result, 0, MaxResultMessages)
+		perPartCount := make(map[int32]int, len(partIDs))
+		for _, m := range allMessages {
+			if perPartCount[m.Partition] >= perPart {
+				continue
+			}
+			perPartCount[m.Partition]++
+			kept = append(kept, m)
+		}
+		allMessages = kept
 		truncated = true
-		warnings = append(warnings, "last-truncated")
+		warnings = append(warnings, "result-cap")
 	}
 	if ctx.Err() == context.DeadlineExceeded {
 		truncated = true
@@ -271,6 +345,7 @@ pollLoop:
 		Topic:             req.Topic,
 		Total:             totalScanned,
 		Matched:           len(allMessages),
+		MatchedRaw:        matchedRaw,
 		Truncated:         truncated,
 		Warnings:          warnings,
 		Messages:          allMessages,
@@ -459,8 +534,8 @@ func ValidateRequest(req *Request) error {
 	if req.Topic == "" {
 		return fmt.Errorf("topic is required")
 	}
-	if req.Last > 5000 {
-		return fmt.Errorf("--last %d exceeds maximum 5000", req.Last)
+	if req.Last > MaxLast {
+		return fmt.Errorf("--last %d exceeds maximum %d", req.Last, MaxLast)
 	}
 	if req.Last <= 0 && !req.HasTimeWindow && !req.HasOffsetRange {
 		return fmt.Errorf("at least one of --last, --since/--until, --offset-from/--offset-to is required")

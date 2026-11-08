@@ -1,0 +1,238 @@
+/* Kafka Pilot global styles.
+   Fluent UI v9 owns component styling via FluentProvider; this file only
+   adds resets, layout helpers, scrollbars, the progress-bar animation, and
+   the JSON viewer palette. Design tokens follow Fluent 2 (4px radius, 8pt
+   grid, system light theme). */
+
+:root {
+  --kp-radius: 4px;
+  --kp-radius-lg: 8px;
+  --kp-grid: 8px;
+  --kp-font-mono: 'Cascadia Code', 'Fira Code', Consolas, 'SF Mono', Menlo,
+    monospace;
+  --kp-bg: #ffffff;
+  --kp-bg-alt: #fafafa;
+  --kp-border: #e0e0e0;
+  --kp-border-strong: #c8c8c8;
+  --kp-text: #1a1a1a;
+  --kp-text-secondary: #595959;
+  --kp-text-tertiary: #8a8a8a;
+  --kp-accent: #0f6cbd;
+  --kp-success: #107c10;
+  --kp-warning: #9b5300;
+  --kp-danger: #c4314b;
+  --kp-running: #0f6cbd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica,
+    Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--kp-text);
+  background: var(--kp-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Thin, modern scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--kp-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--kp-border-strong);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--kp-text-tertiary);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Layout primitives */
+.kp-fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.kp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--kp-grid);
+}
+.kp-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kp-grid);
+}
+.kp-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.kp-mono {
+  font-family: var(--kp-font-mono);
+  font-size: 13px;
+}
+.kp-muted {
+  color: var(--kp-text-secondary);
+}
+.kp-tertiary {
+  color: var(--kp-text-tertiary);
+}
+.kp-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Card surface */
+.kp-card {
+  background: var(--kp-bg);
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius-lg);
+  padding: 16px;
+}
+.kp-card + .kp-card {
+  margin-top: var(--kp-grid);
+}
+
+/* Progress bar (div + CSS animation, per spec) */
+.kp-progress {
+  height: 8px;
+  width: 100%;
+  background: var(--kp-bg-alt);
+  border-radius: var(--kp-radius);
+  overflow: hidden;
+  border: 1px solid var(--kp-border);
+}
+.kp-progress__bar {
+  height: 100%;
+  background: var(--kp-accent);
+  border-radius: var(--kp-radius);
+  transition: width 0.25s ease;
+}
+.kp-progress__bar--indeterminate {
+  width: 40% !important;
+  animation: kp-progress-slide 1.2s ease-in-out infinite;
+}
+@keyframes kp-progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}
+
+/* JSON viewer */
+.kp-json {
+  font-family: var(--kp-font-mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  background: var(--kp-bg-alt);
+  border: 1px solid var(--kp-border);
+  border-radius: var(--kp-radius);
+  padding: 12px;
+  overflow: auto;
+  max-height: 420px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
+.kp-json__key {
+  color: #0f6cbd;
+}
+.kp-json__string {
+  color: #107c10;
+}
+.kp-json__number {
+  color: #9b5300;
+}
+.kp-json__bool {
+  color: #c4314b;
+}
+.kp-json__null {
+  color: #8a8a8a;
+}
+
+/* Status pills */
+.kp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  border: 1px solid transparent;
+}
+.kp-pill--ok {
+  background: #dff6dd;
+  color: #0b6a0b;
+  border-color: #9bd89b;
+}
+.kp-pill--running {
+  background: #e6f1fb;
+  color: #0f548a;
+  border-color: #9bbde6;
+}
+.kp-pill--error {
+  background: #fde7e9;
+  color: #a4262c;
+  border-color: #f0b8bc;
+}
+.kp-pill--warning {
+  background: #fff4ce;
+  color: #8a5400;
+  border-color: #f5d77a;
+}
+.kp-pill--muted {
+  background: #f0f0f0;
+  color: #595959;
+  border-color: #d0d0d0;
+}
+
+/* Spinner */
+.kp-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--kp-border);
+  border-top-color: var(--kp-accent);
+  border-radius: 50%;
+  animation: kp-spin 0.7s linear infinite;
+}
+@keyframes kp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Table cell helpers */
+.kp-cell-numeric {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.kp-cell-mono {
+  font-family: var(--kp-font-mono);
+  font-size: 12.5px;
+}

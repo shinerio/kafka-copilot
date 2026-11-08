@@ -1,19 +1,19 @@
 ---
 name: kp-cli
 description: >-
-  Kafka Pilot (kp) 命令行与本地 REST 服务的详尽使用指南。当需要操作 Kafka——
-  查询/描述 topic 与分区、按关键字/key/时间窗/offset 扫描消息、单条或批量生产消息、
-  查看 consumer group 积压(lag)、管理审计与会话、配置连接 profile、启动/停止/重启
-  本地 Web/API 服务——且目标是通过 kp 的 CLI 或本地 HTTP API 完成时，加载本 skill。
-  涵盖所有子命令与 flag、配置与 SASL/TLS 陷阱、扫描结果字段口径、退出码、REST 端点、
-  以及反复踩过的故障排查。
+  Kafka Pilot (kp) 命令行的使用指南。当需要操作 Kafka——
+  查询/描述 topic 与分区、按关键字(key 表达式)/key/时间窗/offset 扫描消息、单条或批量生产消息、
+  查看 consumer group 积压(lag)、管理审计与会话、选择/配置连接 profile、启动/停止/重启
+  本地服务——且目标是通过 kp 的 CLI 完成时，加载本 skill。
+  涵盖 profile 选择策略、所有子命令与 flag、扫描结果字段口径、退出码。
 ---
 
-# Kafka Pilot CLI 指南（详尽版）
+# Kafka Pilot CLI 指南
 
-Kafka Pilot（命令名 `kp`）是一个单二进制 (`kp.exe` / `kp`) 的 Kafka 数据工具，
-提供 **CLI 直接操作** 和 **本地 Web UI / REST 服务** 两种入口。本指南供 AI Agent
-在调用 kp 时参考，确保命令正确、避免已知的坑。
+Kafka Pilot（命令名 `kp`）是一个单二进制的 Kafka 数据工具，提供 **CLI 直接操作**。本指南供 AI Agent 在调用 kp 时参考，确保命令正确、避免已知的坑。
+
+> 前提：`kp` 已安装并可用（命令名 `kp` / `kp.exe`）。本指南不涉及安装步骤。
+> **本文件是 Agent 使用 kp 的契约：kp 暴露的任何命令 / flag / 退出码 / 输出字段 / 脚本语义发生变化时，必须同步更新本文件**（维护纪律见 `agents.md`）。
 
 ---
 
@@ -23,33 +23,62 @@ Kafka Pilot（命令名 `kp`）是一个单二进制 (`kp.exe` / `kp`) 的 Kafka
 - 用户要按 key / 关键字 / 时间窗 / offset 范围在 Kafka 里翻找消息（排查数据是否写入、落哪个分区）。
 - 用户要向 topic 写一条/一批消息（含脚本化批量造数、dry-run 预览）。
 - 用户要查 consumer group 的积压（lag）排查消费延迟。
-- 用户要配置/修改 Kafka 连接（SASL/TLS），或启动/停止/重启本地 kp 服务。
+- 用户要配置/修改 Kafka 连接（profile）、或启动/停止/重启本地 kp 服务。
 - 用户要审计“谁在什么时候对哪个 topic 做了什么”（kp 自带操作审计）。
 
-> 注意：kp 是**只读/写数据的运维工具**，不负责创建 topic、改分区数、建 ACL 等集群管理动作。
+> 注意：kp 是**只读/写数据的运维工具**，不负责创建 topic、改分区数、建 ACL 等集群管理动作（也**没有**相关命令）。
 
 ---
 
-## 2. 构建与基本可用性
+## 2. 连接 Profile 选择策略（先读，再执行任何读写命令）
+
+kp 通过「连接 profile」区分不同的 Kafka 集群。执行任何读写命令（`topic`/`scan`/`produce`/`group`/`audit`）前，
+**先确定用哪个 profile**，再继续：
+
+1. **列出当前 profile**：`kp profile list`
+2. **按数量分支处理**：
+
+   - **0 个 profile（首次使用）**：先引导用户配置一个，再继续。
+     ```bash
+     # 命令行新增（SASL 为可选项；无 SASL 即匿名/plaintext 连接）
+     kp profile add --name prod \
+       --bootstrap-servers "192.168.85.2:9092" \
+       --sasl-mechanism plain --sasl-username appuser --sasl-password app-secret
+
+     kp profile use prod          # 设为默认，后续可省略 --profile
+     ```
+     配置完成后，可设默认或后续命令显式 `--profile`。
+     **在拿到至少一个可用 profile 之前，不要继续执行读写命令。**
+
+   - **恰好 1 个 profile**：直接默认使用，**无需询问用户、也无需显式 `--profile`**。
+
+   - **多个 profile**：引导/询问用户要操作哪一个，选定后用 `--profile <name>` **显式传参**
+     （不要用 `default_profile` 去猜测用户意图）。
+
+3. 之后的所有示例都以「已选定 profile」为前提：单 profile 时可省 `--profile`，多 profile 时务必带上。
+
+---
+
+## 3. 快速开始
 
 ```bash
-# 在项目根目录
-go build -o kp.exe ./cmd/kp      # Windows
-go build -o kp    ./cmd/kp       # Linux/macOS
-
-./kp --help                     # 顶层命令列表
-./kp <command> --help            # 某命令的 flag 列表
-./kp schema                     # 机器可读：命令清单 + 退出码（可直接解析）
+kp --help                     # 顶层命令列表
+kp <command> --help            # 某命令的 flag 列表
+kp schema                     # 机器可读：命令清单 + 退出码（可直接解析）
 ```
 
 顶层命令：`profile` `topic` `group` `scan` `produce` `session` `audit` `schema`
 `serve` `desktop` `stop` `restart`。
 
+> **会话与审计**：作为 AI Agent，每次任务开始前先 `kp session new` 拿到 6 位短 ID，
+> 之后**每条命令显式携带 `--session <id>` 与 `--intent "<你的意图>"`**，便于在观测区按会话追溯。
+> 未带 `--session` 的命令会归入名为 `default` 的兜底会话。
+
 ---
 
-## 3. 配置目录与环境变量（极易踩坑，先读）
+## 4. 配置目录与 profile 结构
 
-### 3.1 配置目录 `KP_APPDATA`
+### 4.1 配置目录 `KP_APPDATA`
 
 kp 把所有连接配置、pid 文件、审计库放在一个“应用数据目录”：
 
@@ -58,79 +87,46 @@ kp 把所有连接配置、pid 文件、审计库放在一个“应用数据目�
 | Windows | `%APPDATA%/kafka-pilot` （通常 `C:\Users\<user>\AppData\Roaming\kafka-pilot`） |
 | Linux/macOS | `~/.kafka-pilot` |
 
-可用环境变量覆盖：
+可用环境变量覆盖：`export KP_APPDATA=/abs/path/to/dir`（本地开发常用 `test-data/` 做隔离）。
 
-```bash
-export KP_APPDATA=/abs/path/to/dir     # 所有 kp 子命令、serve 都读这个目录
-```
-
-> ⚠️ **一致性铁律**：`kp serve`（服务进程）和 `kp <任何读写配置命令>` 必须指向**同一个**
-> `KP_APPDATA` 目录。否则会出现“我明明配了 profile，但服务列表里看不到”的假象——
-> 那只是服务加载了另一个目录的 `config.yaml`。要么都不设（用默认目录），要么每次都设同一个绝对路径。
-
-### 3.2 配置文件 `config.yaml` 结构
+### 4.2 配置文件 `config.yaml` 结构
 
 ```yaml
 default_profile: prod            # 不传 --profile 时使用的 profile
 profiles:
   - name: prod
-    bootstrap_servers: ["broker1:9092", "broker2:9092"]   # 必填
+    bootstrap_servers: ["broker1:9092", "broker2:9092"]   # 必填，支持多个 broker
     sasl:                         # 可选；无则匿名/plaintext 连接
       mechanism: plain            # plain | scram-sha-256 | scram-sha-512
       username: appuser
-      password: app-secret        # 见 3.3 密码处理
+      password: app-secret        # 仅内核持有，CLI/UI 不感知明文
     tls:                          # 可选；SASL_SSL 或 broker 要求 TLS 时必填
       ca_cert: /path/to/ca.pem    # 单向：客户端校验服务端证书
       skip_verify: true           # 跳过证书校验（仅测试/自签，生产慎用）
 ```
 
 字段说明：
-- `bootstrap_servers`：逗号分隔字符串会被 `ParseBootstrapServers` 拆成数组；CLI 用 `--bootstrap-servers "b1:9092,b2:9092"`。
+- `bootstrap_servers`：逗号分隔字符串会被拆成数组；CLI 用 `--bootstrap-servers "b1:9092,b2:9092"`。
 - `sasl.mechanism`：必须和 broker 端 `sasl.enabled.mechanisms` **完全一致**，否则 broker 拒绝连接。
-- `tls`：见 3.4。
-
-### 3.3 密码的加密与“跨机器失效”陷阱
-
-- 通过 **UI/CLI 输入明文密码**后，kp 在落盘时自动用 DPAPI（Windows）或 base64（其它系统）加密；启动时自动解密回明文，内存里始终是明文。
-- ⚠️ Windows 的 DPAPI 密文与**生成它的机器 + Windows 用户**绑定。把 `config.yaml` 拷到别的机器/用户，
-  解密会静默失败 → 发出的密码变成无效值 → broker 报 `Invalid username or password`
-  （表现和“SASL missing”几乎一样）。**正确做法是在目标机器上重新用 UI/CLI 输入明文密码**，不要手贴密文。
-
-### 3.4 SASL / TLS 监听器类型（连不上时的头号元凶）
-
-| broker listener | 端口(典型) | 客户端配置 |
-|----------------|-----------|-----------|
-| `PLAINTEXT` | 9092 | 不要 sasl、不要 tls |
-| `SASL_PLAINTEXT` | 9092 | 仅 `sasl`，**不要** `tls` |
-| `SASL_SSL` | 9093 | `sasl` **且** `tls`（缺 tls 会报 `broker closed ... SASL missing?`） |
-
-> 报错 `broker closed the connection immediately after a request was issued ... is SASL missing?`
-> 几乎总是“TCP 连上后 broker 立刻关连接”，根因通常是 **SASL_SSL 没配 tls**、**mechanism 不匹配**、
-> 或**生效配置里的密码不是真密码**（见 3.3）。
-
-### 3.5 配置的动态更新（无需重启）
-
-- 通过 **Web UI / REST API / CLI `profile add|use`** 保存 profile 是**即时生效**的：
-  内存更新 + 落盘 + 失效该 profile 的 Kafka 连接缓存，下次操作即用新配置。
-- **唯一仍需重启的场景**：你**直接手改 `config.yaml` 文件**（绕过 UI/API），内存不会刷新，此时才需 `kp restart`。
-- 因此“改了 SASL 还连不上”通常不是代码问题，而是生效配置里密码不对 / 目录不一致 / 旧进程内存被污染（旧二进制 bug，已修复）。
+- `tls` 仅含 `ca_cert` 与 `skip_verify` 两字段（**单向 TLS，不支持 mTLS 双向认证**）。
+- SASL 密码经 Windows DPAPI（其它平台 base64）加密存储，`kp profile show` 输出脱敏为 `****`。
 
 ---
 
-## 4. 全局 flags（所有命令通用）
+## 5. 全局 flags（所有命令通用）
 
 | flag | 含义 |
 |------|------|
-| `--profile <name>` | 指定连接 profile；省略则用 `default_profile` |
+| `--profile <name>` | 指定连接 profile；省略则用 `default_profile`（见 §2 选择策略） |
 | `--session <id>` | 关联审计会话 ID（先用 `kp session new` 拿到） |
 | `--intent "<text>"` | AI 声明的操作意图，写入审计（合规追溯） |
 | `--format json|table` | 输出格式，默认 `json`（`table` 目前等价 JSON 缩进） |
 
 ---
 
-## 5. 命令参考
+## 6. 命令参考
 
-### 5.1 `profile` — 连接配置管理
+### 6.1 `profile` — 连接配置管理
 | 子命令 | 说明 | 关键 flag |
 |--------|------|-----------|
 | `kp profile list` | 列出所有 profile（密码被 mask 成 `****`） | — |
@@ -139,37 +135,33 @@ profiles:
 | `kp profile show <name>` | 查看详情（密码 mask） | — |
 | `kp profile remove <name>` | 删除 profile（若为默认则自动改指第一个） | — |
 
-示例：
-```bash
-kp profile add --name prod \
-  --bootstrap-servers "192.168.85.2:9092" \
-  --sasl-mechanism plain --sasl-username appuser --sasl-password app-secret
-kp profile use prod
-```
+> 注意：**CLI 没有“修改已有 profile”的子命令**。若要改某个 profile 的 bootstrap / SASL / TLS，
+> 请 `kp profile remove` 后重新 `kp profile add`。
+> `kp profile show` 仅查看（密码 mask 为 `****`），`kp profile use` 仅切换默认。
 
-### 5.2 `topic` — 浏览 topic
+### 6.2 `topic` — 浏览 topic
 | 子命令 | 说明 | 关键 flag |
 |--------|------|-----------|
-| `kp topic list` | 列出 topic（名称、分区数、最新 offset） | `--filter <子串>` |
-| `kp topic describe <topic>` | 描述单 topic（分区数、副本、配置等） | — |
+| `kp topic list` | 列出 topic（**极简**：名称、分区数、各分区最新 offset） | `--filter <子串>` |
+| `kp topic describe <topic>` | 描述单 topic；结构与 list 单项**同构**（`name` / `partitions_count` / `partitions[]`，每元素 `partition`+`latest_offset`），**不**含副本 / 清理策略 / HWM 等其它元数据 | — |
 
 ```bash
 kp topic list --filter order
 kp topic describe kp-multi-part --profile prod
 ```
 
-### 5.3 `group` — consumer group
+### 6.3 `group` — consumer group
 | 子命令 | 说明 | 关键 flag |
 |--------|------|-----------|
 | `kp group list` | 列出消费组 | `--topic <topic>` 按 topic 过滤 |
-| `kp group lag <group>` | 查看某组的积压 lag | `--topic <topic>` 按 topic 过滤 |
+| `kp group lag <group>` | 查看某组的积压 lag（超阈值默认 10000 标 `highLag`） | `--topic <topic>` 按 topic 过滤 |
 
 ```bash
 kp group list --profile prod
 kp group lag my-consumer --topic kp-multi-part --profile prod
 ```
 
-### 5.4 `scan` — 扫描消息（核心，最容易用错）
+### 6.4 `scan` — 扫描消息（核心，最容易用错）
 
 **flags：**
 
@@ -177,39 +169,68 @@ kp group lag my-consumer --topic kp-multi-part --profile prod
 |------|--------|------|
 | `--topic` | 必填 | 目标 topic |
 | `--partition` | 全部 | 逗号分隔的分区号，如 `0,2` |
-| `--last` | 100 | **每分区**回扫条数，CLI 上限 10000；Web UI 固定五档 100/500/1000/5000/10000 |
+| `--last` | 100 | **每分区**回扫条数，CLI 上限 10000 |
 | `--since` / `--until` | — | 时间窗，RFC3339（如 `2026-11-08T00:00:00+08:00`） |
 | `--offset-from` / `--offset-to` | — | 精确 offset 范围（与 `--last` 互斥，设了后者归零） |
 | `--key` | — | 精确 key 过滤 |
-| `--key-regex` | — | key 正则过滤 |
-| `--key-partition` | false | **实验**：只扫 murmur2(key) 算出的单分区（见 5.4.1） |
-| `--keyword` | — | value 子串过滤 |
+| `--key-regex` | — | key 正则过滤（RE2 语法） |
+| `--key-partition` | false | **实验**：只扫 murmur2(key) 算出的单分区（见 6.4.1） |
+| `--keyword` | — | value 关键字过滤（支持 AND/OR/NOT 布尔表达式，见下方说明） |
 | `--ignore-case` | true | 关键字大小写不敏感 |
-| `--expr` | — | jq 表达式过滤 |
-| `--timeout` | 30 | 扫描超时（秒） |
+| `--expr` | — | jq 表达式过滤（作用于消息 value 解析后的 JSON，见下方说明） |
+| `--timeout` | 30 | 扫描超时（秒，1~300） |
 | `--output <file>` | — | 结果写文件而非 stdout |
 
+**`--keyword` 是布尔表达式，不只是子串**：除默认的大小写不敏感子串匹配外，
+`--keyword` 支持一套小型布尔表达式语言，用于组合多个条件：
+
+- 运算符：`AND` / `OR` / `NOT`（大写；优先级 `NOT` > `AND` > `OR`，括号最高）。
+- 词项：裸词（如 `ERROR`）或引号包裹的短语（如 `"error code"`）；每个词项都是对
+  “key + value + headers 拼接文本”的大小写不敏感子串匹配。
+- 若表达式语法非法，会**自动降级**为整串的普通子串匹配（不报错，只是失去组合能力）。
+
+```bash
+kp scan --topic orders --keyword "ERROR AND retry"                  # 同时含 ERROR 与 retry
+kp scan --topic orders --keyword "FAILED OR (timeout AND NOT retry)"  # 复杂组合
+kp scan --topic orders --keyword '"error code" AND retry'           # 短语 + 词项
+```
+
+**`--expr` 是 jq 表达式（作用在消息 value 的解析结果上）**：`--expr` 接收标准
+[jq](https://jqlang.github.io/jq/) 查询，作用对象是消息 **value 解析后的 JSON**（若 value 不是合法 JSON，则退化为原文字符串），
+命中条件为“表达式结果为真值（truthy）”。
+
+- 与 `--keyword` 的区别：`--keyword` 只在文本里做子串/布尔匹配；`--expr` 能按 JSON 结构做精确字段判断。
+- 表达式解析/编译失败会**直接报错退出**（不会降级），写错会立即被发现。
+
+```bash
+kp scan --topic orders --expr '.status == "FAILED"' --profile prod
+kp scan --topic orders --expr '(.amount > 100) and (.currency == "USD")' --profile prod
+```
+
 **结果字段口径（很重要，避免误读）：**
-- `total`：所有被扫描分区的**总扫描条目数**（= 分区数 × 每分区回扫量，受扫描上限约束）。
-- `matched`：应用全部过滤器（key/keyword/时间窗/expr）后的**命中数**。
-- `matched_raw`：仅在被“安全上限/超时”截断时出现，表示截断前的原始命中数。
-- `truncated`：是否发生了截断（安全上限 50000 条，或超时）。**正常小扫描不会截断**。
-- `warnings`：如 `result-cap` / `timeout`。
-- `messages[]`：命中的消息列表（含 partition、offset、key、value、timestamp）。
+- `opId`：本次操作 ID。
+- `total`：本次**实际读取并检查**的原始消息数（≈ 分区数 × 每分区回扫量），**不是 topic 总消息数、也不是命中数**。
+- `matched`：三层过滤后的**全部命中数**，各分区结果都保留、按时间倒序跨分区归并；常规场景 `matched ≤ 分区数 × last`。
+- `matched_raw`：仅在被「安全上限 50000 条 / 超时」截断时出现，为截断前真实命中数。
+- `truncated`：是否发生了截断（安全上限 `MaxResultMessages=50000`，或超时）。**正常小扫描不会截断**。
+- `warnings`：机器码，如 `scan>1000` / `result-cap` / `timeout` / `key-partition`；UI 会译为中文。
+- `partition_ranges`：各分区实际扫描区间，前端据此生成「结果分区」筛选条。
+- `messages[]`：命中消息列表（含 `partition` / `offset` / `key` / `value` / `timestamp` / `headers`）。
 - `key_partition` / `key_partition_count`：**仅当使用 `--key-partition`** 时出现，标明实际只扫了哪个分区、总共几个分区。
+- `skippedNonUtf8Key`：因 key 非 UTF-8 而未参与 key 过滤的条数。
 
 > 例：`kp-multi-part` 有 12 个分区，`--last 100` → `total=1200`；若再加 `--keyword xxx` 命中 100 条，
 > 则 `matched=100`。这**不是截断**，而是 12 个分区各回扫 100 条共 1200 条被检查、其中 100 条匹配。
-> 没有任何“全局截断”——之前 `matched` 远小于 `total` 的旧行为是个已修复的 bug。
+> 没有任何“全局截断到 100 条”——旧行为（把 1200 砍成 100）是已修复的 bug。
 
-**5.4.1 `--key-partition` 实验开关（会静默漏数据！）**
+**6.4.1 `--key-partition` 实验开关（会静默漏数据！）**
 - 开启后，kp 用标准 Kafka 默认分区器的 murmur2 哈希：`murmur2(key) & 0x7fffffff % 分区数`，
   只扫描算出的**那一个**分区，并忽略 `--partition` 显式选择。
 - **风险**：只要生产端用了**非标准分区器**（如 `ManualPartitioner` 显式指定分区）或发生过**分区扩缩容**，
   相同 key 的记录可能落在别的 partition → **本开关会静默漏掉这些数据**。即使“没扩缩容”，
   只要写入端用的是异源分区器也会漏。默认关闭，仅在你能 100% 确认生产端用默认分区器时再用。
-- 想先“算一下 key 会落哪个分区”而不缩小扫描范围，用 REST `GET /api/key-partition`
-  （见第 8 节）或 Web UI 的「按 key 定位分区」开关（它只预置分区选择、不强制缩小）。
+- 强制约束：开启 `--key-partition` 时**必须**提供精确 `--key`，且**不能与 `--key-regex` 同用**，
+  否则直接报错退出（避免“模糊条件 + 缩窄分区”造成的漏扫错觉）。
 
 示例：
 ```bash
@@ -223,16 +244,16 @@ kp scan --topic orders --partition 0,2 --since 2026-11-01T00:00:00+08:00 --until
 kp scan --topic orders --key "user-42" --profile prod
 ```
 
-### 5.5 `produce` — 生产消息
+### 6.5 `produce` — 生产消息
 
 **单条模式（默认）：**
 | flag | 必填 | 说明 |
 |------|------|------|
 | `--topic` | ✅ | 目标 topic |
-| `--key` 或 `--key-file` | ✅ | 消息 key；**key 决定分区**（默认分区器） |
+| `--key` 或 `--key-file` | ✅ | 消息 key；**key 决定分区**（默认分区器），不可手动指定分区 |
 | `--value` 或 `--value-file` | ✅ | 消息 value |
-| `--header key=value` | 可重复 | 消息头 |
-| `--dry-run` | — | 仅 CLI batch 有；单条无 |
+| `--header key=value` | 可重复 | 消息头（可重复指定多个） |
+| `--dry-run` | — | 仅 CLI 批量模式有；单条无 |
 
 ```bash
 kp produce --topic orders --key "user-42" --value '{"amount":99}' --header src=cli --profile prod
@@ -241,22 +262,27 @@ kp produce --topic orders --key "user-42" --value '{"amount":99}' --header src=c
 **批量模式（JS 脚本）：** 加 `--script <file.js>` 即进入批量。
 | flag | 默认 | 说明 |
 |------|------|------|
-| `--script` | — | 本地 `.js` 文件路径（Web UI 用内联内容） |
-| `--count` | 100 | 生成调用次数（generate 被调用 count 次） |
+| `--script` | — | 本地 `.js` 文件路径（批量模式必须） |
+| `--count` | 100 | **总消息条数**（生成器被调用直到累计产出 N 条即停） |
 | `--concurrency` | 8 | 并发（1–32） |
 | `--rate` | 0 | 限速 msgs/sec（0=不限） |
-| `--dry-run` | false | 仅预览不发送，结果含 `samples` |
+| `--dry-run` | false | 仅预览不发送，返回前 5 条样例 + `generateCalls` / `messagesBuilt` |
 
 脚本约定（goja JS 沙箱）：
-- **必须导出** `function generate(ctx) { ... }`（返回单条消息对象 / 消息数组 / `null` 表示结束流）。
-- `ctx` 提供的变量：
+- **必须导出** `function generate(ctx) { ... }`（返回**单条消息对象** / **消息数组** / `null` 表示结束流）。
+- `ctx` 提供的变量（**有且仅有这 5 个**，没有 `now()` / `topic` / `count` 等）：
   - `ctx.index`：当前调用序号（int，从 0 开始）
   - `ctx.time`：当前毫秒时间戳（`time.Now().UnixMilli()`）
-  - `ctx.random()`：返回 `[0,1)` 浮点随机数
+  - `ctx.random()`：返回 `[0,1)` 浮点随机数（每次调用独立取样）
   - `ctx.uuid()`：返回 v4 UUID 字符串
-  - `ctx.pick(arr)`：从数组随机取一个元素
-- 消息对象字段：`{ key, value, headers?, partition? }`（`headers` 为 `{k:v}` 对象，`partition` 可选可省略）。
-- 单条 `generate` 调用返回数组即可一次造多条；脚本**无需自己写循环**，`--count` 决定调用次数。
+  - `ctx.pick(arr)`：从数组 / 对象随机取一个元素
+- 返回消息对象字段：`{ key?, value, headers? }`
+  - `value` **必须是字符串**（对象请用 `JSON.stringify`，否则会变成 `[object Object]`）
+  - `key` 可省略，省略时工具自动补 `kp-auto-<时间戳>-<序号>`
+  - `headers` 为 `{k:v}` 对象；**不支持 `partition`（分区永远由 key 判定）**
+- 脚本**无需自己写循环**，`--count` 决定调用次数；一次 `generate` 返回数组即可一次造多条。
+- 沙箱**无 IO**：无 `console` / `require` / `import` / `export` / `fetch` / `setTimeout` / `process`；想在脚本里看产出请用 `--dry-run`。
+- 编译与每次 `generate(ctx)` 调用各享 **5s** 预算，超时经 `vm.Interrupt` 中断并返回明确错误；已写入的消息不回滚。
 
 示例脚本 `gen.js`：
 ```js
@@ -273,29 +299,39 @@ kp produce --topic orders --script gen.js --count 1000 --concurrency 16 --profil
 kp produce --topic orders --script gen.js --count 10 --dry-run --profile prod   # 先看样本
 ```
 
-### 5.6 `session` — 审计会话
+**返回字段口径：**
+- **单条模式**返回 `{ "topic", "partition", "offset", "produced": 1 }`（produced 恒为 1）。
+- **批量模式**返回 `BatchResult`：
+  - `produced` / `failed`：成功 / 失败条数；`cancelled`：是否被限速或中断取消。
+  - `tps`：实际吞吐（条/秒）；`elapsedMs`：耗时（毫秒）。
+  - `generateCalls`：脚本 `generate(ctx)` 被调用的次数；`messagesBuilt`：实际构建出的消息数
+    （`generate` 返回数组可一次造多条，故可能大于 `generateCalls`）。
+  - `dryRun`：`true` 表示仅预览未发送；`samples[]`：预览样本（含 key、value、headers、partition）。
+
+### 6.6 `session` — 审计会话
 | 子命令 | 说明 | flag |
 |--------|------|------|
-| `kp session new` | 创建会话，返回 `sessionId` | `--label` |
+| `kp session new` | 创建会话，返回 6 位短 `sessionId`（如 `K3M9XT`） | `--label` |
 | `kp session end <id>` | 结束会话 | — |
 | `kp session list` | 列出会话 | — |
 | `kp session show <id>` | 查看会话详情 + 其下操作 | — |
 
 用法：先把 `--session <id>` 传给后续 `scan`/`produce`，便于在审计里按会话归类。
 
-### 5.7 `audit` — 操作审计
+### 6.7 `audit` — 操作审计
 | 子命令 | 说明 | flag |
 |--------|------|------|
 | `kp audit list` | 列出操作 | `--session` `--source ai|human` `--since`(RFC3339) |
 | `kp audit show <op-id>` | 操作详情 | — |
-| `kp audit clear` | 清空审计 | `--before`(RFC3339) |
+| `kp audit clear` | 清空审计（**含快照**） | `--before`(RFC3339) |
 
-审计会记录每条 `scan`/`produce` 的调用者来源（ai/human）、意图（`--intent`）、参数摘要、结果。Web UI 也有审计流。
+审计会记录每条 `scan`/`produce` 的调用者来源（ai/human）、意图（`--intent`）、参数摘要、结果。
+> ⚠️ **作为 Agent 不要主动执行 `kp audit clear`**——它会抹除操作留痕。仅在用户明确要求时才执行。
 
-### 5.8 `schema` — 命令自描述
+### 6.8 `schema` — 命令自描述
 `kp schema` 输出 JSON：所有命令名 + 退出码映射。Agent 可直接解析它来确认支持的命令与退出码，无需硬编码。
 
-### 5.9 服务生命周期：`serve` / `desktop` / `stop` / `restart`
+### 6.9 服务生命周期：`serve` / `desktop` / `stop` / `restart`
 | 命令 | 说明 |
 |------|------|
 | `kp serve --port <n>` | 启动本地 HTTP 服务；`--port 0` 自动选空闲端口并打印 URL |
@@ -306,24 +342,17 @@ kp produce --topic orders --script gen.js --count 10 --dry-run --profile prod   
 - 服务**只监听 `127.0.0.1`**（本机），远程访问不到。
 - `stop`/`restart` 通过 `KP_APPDATA` 目录下的 `kp.pid` 定位实例（记录 `pid`/`port`/`started_at`），
   **不接收端口参数**，因此 stop/restart 与 serve 必须在同一 `KP_APPDATA` 下。
-- ⚠️ **常驻陷阱**：服务是前台长驻进程。若用 `./kp serve &` 在普通 shell 里起，shell 退出会被回收（exit 0），
-  表现就是“服务莫名其妙没了”。
-  - 推荐：用工具/系统的**后台任务机制**常驻，或用 **Windows 任务计划程序**（`schtasks`）/ `nssm` 注册成服务，
-    实现开机自启、会话无关。
-  - 示例（管理员 PowerShell）：
-    ```powershell
-    schtasks /Create /TN "KafkaPilot" /TR "D:\path\kp.exe serve --port 18080" /SC ONSTART /RL HIGHEST /F
-    schtasks /Run /TN "KafkaPilot"
-    ```
+- ⚠️ **常驻注意**：服务是前台长驻进程。若用 `./kp serve &` 在普通 shell 里起，shell 退出会被回收，
+  表现就是“服务莫名其妙没了”。需要长期常驻时，请用工具/系统的后台任务机制拉起，而不是依赖交互式 shell。
 
 ---
 
-## 6. 退出码（供 Agent 判错）
+## 7. 退出码（供 Agent 判错）
 
 | 码 | 含义 | 典型原因 |
 |----|------|----------|
 | 0 | 成功 | — |
-| 2 | 参数错误 | 缺必填 flag、格式错误（`--since` 非 RFC3339）、offset 范围非法 |
+| 2 | 参数错误 | 缺必填 flag、格式错误（`--since` 非 RFC3339）、offset 范围非法、`--last > 10000` |
 | 3 | 连接错误 | Kafka 不可达、SASL/TLS 配置错误、认证失败 |
 | 4 | 超时 | 扫描/生产超过 `--timeout` |
 | 5 | 内部错误 | 序列化失败、未预期异常 |
@@ -332,11 +361,11 @@ kp produce --topic orders --script gen.js --count 10 --dry-run --profile prod   
 
 ---
 
-## 7. 典型工作流
+## 8. 典型工作流
 
 **场景 A：确认数据有没有写入某个 topic、落在哪**
 ```bash
-kp profile use prod
+kp profile use prod                              # 单 profile 可省；多 profile 先选好
 kp scan --topic orders --key "order-1001" --profile prod      # 精确 key 定位
 kp scan --topic orders --keyword "1001" --last 1000 --profile prod   # 关键字兜底
 ```
@@ -352,73 +381,7 @@ kp produce --topic orders --script gen.js --count 5000 --concurrency 16 --profil
 kp group lag my-consumer --topic orders --profile prod
 ```
 
-**场景 D：起服务供 Web UI / 脚本调用**
+**场景 D：启动本地服务**
 ```bash
-kp serve --port 18080        # 然后用 curl 调 /api/*（见下）
+kp serve --port 18080        # 启动本地服务（仅监听 127.0.0.1）
 ```
-
----
-
-## 8. REST API 速查（`kp serve` 之后）
-
-服务监听 `http://127.0.0.1:<port>`。所有 JSON 响应错误含 `code`/`message`/`hint`。
-（与 CLI 等价，便于 Agent 用 `curl`/HTTP 客户端调用，避免反复起进程。）
-
-| 方法 & 路径 | 说明 |
-|-------------|------|
-| `GET /api/health` | 健康检查 `{"status":"ok"}` |
-| `GET /api/profiles` | 列出 profile（密码 mask） |
-| `POST /api/profiles` | 新增 profile（body 同 Profile 结构） |
-| `GET /api/profiles/{name}` | 查看 |
-| `PUT /api/profiles/{name}` | 更新（**即时生效**，密码传 `****` 表示不改） |
-| `DELETE /api/profiles/{name}` | 删除 |
-| `PUT /api/profiles/{name}/default` | 设为默认 |
-| `GET /api/topics?profile=&filter=` | 列 topic |
-| `GET /api/topics/{topic}?profile=` | 描述 topic |
-| `GET /api/key-partition?topic=&key=&profile=` | 算 key 落哪个分区（只读提示，不缩小扫描） |
-| `POST /api/scan` | 扫描，body 见 `ScanRequest`（字段同 CLI flags：topic/partitions/last/since/until/offset_from/offset_to/key/key_regex/keyword/ignore_case/expr/timeout_sec/key_partition/profile） |
-| `POST /api/produce` | 单条生产，body `{profile,topic,key,value,headers}` |
-| `POST /api/produce/batch` | 批量生产，body 同 `BatchRequest`（topic/script_content/count/concurrency/rate/dry_run） |
-| `GET /api/groups?profile=&topic=` | 列消费组 |
-| `GET /api/groups/{group}/lag?profile=&topic=` | 消费组 lag |
-| `GET /api/sessions` / `GET /api/sessions/{id}` / `DELETE /api/sessions` | 会话 |
-| `GET /api/audit/ops` / `DELETE /api/audit/ops` / `GET /api/audit/ops/{op_id}` / `GET /api/audit/ops/{op_id}/snapshot` / `GET /api/audit/stream` / `DELETE /api/audit` | 审计 |
-
-示例：
-```bash
-# 算 key 落哪个分区（只读提示）
-curl "http://127.0.0.1:18080/api/key-partition?topic=orders&key=user-42&profile=prod"
-
-# 扫描（与 CLI 等价）
-curl -s -X POST http://127.0.0.1:18080/api/scan \
-  -H 'Content-Type: application/json' \
-  -d '{"profile":"prod","topic":"orders","last":500,"keyword":"1001"}'
-```
-
----
-
-## 9. 故障排查清单
-
-1. **连不上 / “SASL missing”**
-   - 确认 listener 类型：SASL_SSL 必须加 `tls` 块；SASL_PLAINTEXT 不要 tls（§3.4）。
-   - `mechanism` 与服务端一致；端口是开了 SASL 的那个 listener。
-   - `GET /api/profiles`（或 `kp profile show`）确认生效的 `sasl.mechanism`/密码正确。
-   - 密码若是 DPAPI 密文且跨机器/用户 → 重新输入明文（§3.3）。
-
-2. **“我配的 profile 不见了”**
-   - 几乎总是 `KP_APPDATA` 目录不一致（§3.1）：serve 和 CLI 加载了不同的 `config.yaml`。统一目录即可。
-
-3. **改了配置还是连不上**
-   - 通过 UI/API/CLI 保存是即时生效的（§3.5）；只有手改文件才需 `kp restart`。
-   - 确认是**新二进制**（`go build` 后来）在跑——旧进程内存可能被污染。
-
-4. **服务莫名其妙没了**
-   - 长驻进程被 shell 回收（§5.9）。改用后台任务/任务计划常驻。
-
-5. **scan 结果 `total` 很大、`matched` 很小，是不是被截断了？**
-   - 一般不是。`total`=各分区回扫总量，`matched`=过滤命中（§5.4 字段口径）。
-   - 只有 `truncated=true`（安全上限 50000 或超时）才需担心丢数据，那时会出现 `matched_raw`。
-
-6. **`--key-partition` 为什么漏数据？**
-   - 只扫 murmur2 算出的单分区；生产端若用异源分区器/显式分区/发生过扩缩容，记录会在别的 partition（§5.4.1）。
-   - 优先用 `--key`（精确 key 全量扫描定位）而非 `--key-partition`。

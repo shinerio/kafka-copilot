@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kafka Pilot · 前端风格选型</title>
+
+<!-- 字体：每套风格一套独特的展示字 + 内敛正文字，禁止默认字体 -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700;800&family=Archivo+Black&family=Chakra+Petch:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+
+<style>
+/* ============================================================
+   设计令牌（所有颜色/字体/圆角写成变量，组件内不硬编码）
+   四种风格 = 四组变量覆盖，结构同一套，方便 apples-to-apples 对比
+   ============================================================ */
+:root {
+  /* —— 默认主题 A：工业控制台（暗色）—— */
+  --bg: #0d0f13;
+  --surface: #14171c;
+  --surface-2: #1b1f26;
+  --text: #e8ebef;
+  --muted: #8b94a3;
+  --border: rgba(232, 235, 239, 0.12);
+  --border-strong: rgba(232, 235, 239, 0.28);
+  --border-w: 1px;
+  --accent: #ff9e2c;
+  --accent-ink: #1a1206;
+  --ok: #3fb950;
+  --warn: #e3b341;
+  --err: #ff6b6b;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --font-display: "Archivo", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Code", monospace;
+  --shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-hard: 0 0 0 transparent;
+  --topbar-h: 52px;
+  --sidebar-w: 232px;
+  --atmosphere: "industrial";
+}
+
+/* B：复古未来 · 霓虹（暗色 + CRT） */
+[data-theme="b"] {
+  --bg: #070a0f;
+  --surface: #0c121b;
+  --surface-2: #111a26;
+  --text: #d6f7ff;
+  --muted: #5f8597;
+  --border: rgba(76, 201, 240, 0.20);
+  --border-strong: rgba(76, 201, 240, 0.45);
+  --border-w: 1px;
+  --accent: #4cc9f0;
+  --accent-ink: #04141a;
+  --ok: #4ade80;
+  --warn: #ffd166;
+  --err: #ff4d6d;
+  --radius: 2px;
+  --radius-lg: 3px;
+  --font-display: "Chakra Petch", system-ui, sans-serif;
+  --font-body: "JetBrains Mono", monospace;
+  --font-mono: "JetBrains Mono", monospace;
+  --shadow-sm: 0 0 0 1px rgba(76, 201, 240, 0.15);
+  --shadow-md: 0 0 28px rgba(76, 201, 240, 0.12);
+  --shadow-hard: 0 0 0 transparent;
+  --atmosphere: "retro";
+}
+
+/* C：粗野主义（明亮 + 粗黑线 + 硬阴影） */
+[data-theme="c"] {
+  --bg: #f2efe6;
+  --surface: #ffffff;
+  --surface-2: #ffffff;
+  --text: #0a0a0a;
+  --muted: #4a4a44;
+  --border: #0a0a0a;
+  --border-strong: #0a0a0a;
+  --border-w: 2.5px;
+  --accent: #ff4d00;
+  --accent-ink: #ffffff;
+  --ok: #1f7a3d;
+  --warn: #b06a00;
+  --err: #c1272d;
+  --radius: 0px;
+  --radius-lg: 0px;
+  --font-display: "Archivo Black", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --shadow-sm: 0 0 0 transparent;
+  --shadow-md: 6px 6px 0 #0a0a0a;
+  --shadow-hard: 6px 6px 0 #0a0a0a;
+  --atmosphere: "brutal";
+}
+
+/* D：极致极简（暖白 + 衬线展示 + 单一强调色） */
+[data-theme="d"] {
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --surface-2: #f3efe8;
+  --text: #1a1714;
+  --muted: #8a8178;
+  --border: #e6e0d6;
+  --border-strong: #d6cebf;
+  --border-w: 1px;
+  --accent: #d9482b;
+  --accent-ink: #ffffff;
+  --ok: #3f7d52;
+  --warn: #b5832b;
+  --err: #c0392b;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.06);
+  --shadow-hard: 0 0 0 transparent;
+  --atmosphere: "minimal";
+}
+
+/* ============================================================
+   选型页自身（gallery chrome）—— 中性灰，不让它抢戏
+   ============================================================ */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  background: #0b0b0d;
+  color: #e9e9ec;
+  -webkit-font-smoothing: antialiased;
+}
+.gallery {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+}
+.gallery__head h1 {
+  font-family: "Archivo", sans-serif;
+  font-weight: 800;
+  font-size: 30px;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+.gallery__head p { color: #9aa0aa; margin: 0 0 20px; font-size: 14px; line-height: 1.6; }
+
+/* 风格切换器 */
+.switcher { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.switcher button {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cfd3da;
+  background: #18181c;
+  border: 1px solid #2a2a30;
+  border-radius: 999px;
+  padding: 9px 18px;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background .18s ease, color .18s ease, border-color .18s ease, transform .12s ease;
+}
+.switcher button:hover { border-color: #4a4a55; color: #fff; }
+.switcher button[aria-pressed="true"] {
+  background: #ff9e2c; color: #1a1206; border-color: #ff9e2c; font-weight: 700;
+}
+.switcher button:focus-visible { outline: 2px solid #ff9e2c; outline-offset: 2px; }
+
+/* 定调说明卡 */
+.note {
+  background: #16161a;
+  border: 1px solid #26262c;
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-bottom: 22px;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: #c9ccd2;
+}
+.note b { color: #fff; }
+.note .note__tag {
+  display: inline-block; font-family: "JetBrains Mono", monospace; font-size: 11px;
+  letter-spacing: .08em; text-transform: uppercase; color: #ff9e2c;
+  border: 1px solid #ff9e2c55; border-radius: 4px; padding: 2px 8px; margin-right: 8px;
+}
+.note .note__meta { color: #8a8f98; }
+
+/* ============================================================
+   APP 外壳（被对比的 Kafka Pilot 真实界面）
+   ============================================================ */
+.frame {
+  position: relative;
+  border: 1px solid #2a2a30;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  transition: background .35s ease, color .35s ease;
+}
+/* 氛围层：随主题切换的纹理/光晕 */
+.frame::before {
+  content: "";
+  position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  opacity: 1;
+  transition: opacity .35s ease;
+}
+[data-theme="a"] .frame::before {
+  background:
+    radial-gradient(60rem 36rem at 88% -8%, rgba(255,158,44,.10), transparent 60%),
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 100% 28px,
+    linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px) 0 0 / 28px 100%;
+}
+[data-theme="b"] .frame::before {
+  background:
+    repeating-linear-gradient(0deg, rgba(76,201,240,.05) 0 1px, transparent 1px 3px),
+    radial-gradient(50rem 30rem at 50% 120%, rgba(76,201,240,.16), transparent 60%),
+    linear-gradient(90deg, rgba(76,201,240,.06) 1px, transparent 1px) 0 0 / 40px 100%;
+}
+[data-theme="c"] .frame::before { background: transparent; }
+[data-theme="d"] .frame::before {
+  background:
+    radial-gradient(48rem 30rem at 12% -10%, rgba(217,72,43,.06), transparent 60%),
+    radial-gradient(40rem 30rem at 100% 0%, rgba(0,0,0,.03), transparent 55%);
+}
+
+.shell {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-areas: "top top" "side main";
+  min-height: 640px;
+}
+
+/* 顶栏 */
+.topbar {
+  grid-area: top;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  border-bottom: var(--border-w) solid var(--border);
+  background: var(--surface);
+}
+.brand { display: flex; align-items: center; gap: 9px; }
+.brand__mark {
+  width: 26px; height: 26px; display: grid; place-items: center;
+  background: var(--accent); color: var(--accent-ink);
+  border-radius: var(--radius); font-weight: 800; font-family: var(--font-display);
+  font-size: 15px;
+}
+.brand__name {
+  font-family: var(--font-display); font-weight: 800; font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.vdiv { width: 1px; height: 22px; background: var(--border-strong); }
+.lbl { color: var(--muted); font-size: 12.5px; }
+.grow { flex: 1 1 auto; }
+.select {
+  height: 32px; min-width: 168px; padding: 0 10px;
+  border: var(--border-w) solid var(--border-strong);
+  border-radius: var(--radius); background: var(--bg); color: var(--text);
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  border: var(--border-w) solid transparent;
+}
+.pill--ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.pill--err { background: color-mix(in srgb, var(--err) 18%, transparent); color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+.port { font-family: var(--font-mono); font-size: 13px; color: var(--muted); }
+.actor {
+  font-family: var(--font-mono); font-size: 12px; color: var(--muted);
+  border: var(--border-w) solid var(--border); border-radius: var(--radius);
+  padding: 4px 10px;
+}
+
+/* 侧边导航 */
+.sidebar {
+  grid-area: side;
+  border-right: var(--border-w) solid var(--border);
+  background: var(--surface);
+  padding: 10px 8px;
+  overflow-y: auto;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; border-radius: var(--radius);
+  color: var(--muted); font-size: 14px; cursor: pointer; user-select: none;
+  transition: background .15s ease, color .15s ease;
+}
+.nav-item:hover { background: var(--surface-2); color: var(--text); }
+.nav-item .ico { width: 18px; height: 18px; flex: none; }
+.nav-item.is-active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent); font-weight: 700;
+}
+.nav-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 主内容 */
+.main { grid-area: main; overflow: auto; padding: 22px; background: var(--bg); }
+.page-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.page-title { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.02em; margin: 0; }
+.page-sub { color: var(--muted); font-size: 13px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.search {
+  flex: 1 1 240px; max-width: 360px; height: 34px; padding: 0 12px;
+  border: var(--border-w) solid var(--border-strong); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); font: inherit; font-size: 13px;
+}
+.search:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.btn {
+  height: 34px; padding: 0 16px; border-radius: var(--radius);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+  border: var(--border-w) solid var(--border-strong); background: var(--surface); color: var(--text);
+  transition: transform .12s ease, background .15s ease;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn--primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn--primary:hover { filter: brightness(1.06); background: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 999px; font-size: 12px; cursor: pointer;
+  border: var(--border-w) solid var(--border-strong); background: var(--surface); color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.chip.is-on { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+/* 卡片 */
+.card {
+  background: var(--surface); border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-lg); padding: 0; overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+.card__head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; border-bottom: var(--border-w) solid var(--border);
+  font-size: 13px; font-weight: 600;
+}
+.card__body { padding: 4px 16px 14px; }
+
+/* 表格 */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: var(--border-w) solid var(--border); }
+th {
+  font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted);
+  font-weight: 600; background: var(--surface-2);
+}
+td { color: var(--text); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--surface-2); }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+.tname { font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.row-act { color: var(--accent); cursor: pointer; font-weight: 600; }
+.row-act:hover { text-decoration: underline; }
+
+/* JSON 预览 */
+.json {
+  font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
+  background: var(--surface-2); border: var(--border-w) solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px; margin: 16px 0 0;
+  overflow: auto; max-height: 240px; white-space: pre-wrap; word-break: break-word;
+  border-left: 3px solid var(--accent);
+}
+.json .k { color: var(--accent); }
+.json .s { color: var(--ok); }
+.json .n { color: var(--warn); }
+.json .b { color: var(--err); }
+
+/* 状态条 */
+.status-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+/* 入场编排（错峰），降级用 reduced-motion */
+.reveal { opacity: 0; transform: translateY(16px); }
+.frame.is-in .reveal {
+  opacity: 1; transform: none;
+  transition: opacity .42s cubic-bezier(.16,1,.3,1), transform .42s cubic-bezier(.16,1,.3,1);
+}
+.frame.is-in .reveal:nth-child(1) { transition-delay: .04s; }
+.frame.is-in .reveal:nth-child(2) { transition-delay: .12s; }
+.frame.is-in .reveal:nth-child(3) { transition-delay: .20s; }
+.frame.is-in .reveal:nth-child(4) { transition-delay: .28s; }
+.frame.is-in .reveal:nth-child(5) { transition-delay: .36s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .switcher button, .btn, .nav-item { transition: none !important; }
+}
+
+/* 小屏：外壳退化为堆叠，导航变顶部横排 */
+@media (max-width: 760px) {
+  .shell { grid-template-columns: 1fr; grid-template-areas: "top" "side" "main"; }
+  .sidebar { border-right: none; border-bottom: var(--border-w) solid var(--border); display: flex; gap: 4px; overflow-x: auto; }
+  .nav-item { white-space: nowrap; }
+}
+
+.footnote { color: #7a7f88; font-size: 12px; margin-top: 18px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="gallery">
+  <div class="gallery__head">
+    <h1>Kafka Pilot · 前端风格选型</h1>
+    <p>同一块真实界面（顶栏 + 侧边导航 + Topics 页），四套气质实时切换。下方「定调说明」随所选风格更新。挑中哪套，我们就把对应令牌落到 <code>web/src/index.css</code> 的 <code>--kp-*</code> 体系里，再逐页打磨。</p>
+  </div>
+
+  <div class="switcher" role="group" aria-label="风格切换">
+    <button data-theme="a" aria-pressed="true">A · 工业控制台</button>
+    <button data-theme="b" aria-pressed="false">B · 复古霓虹</button>
+    <button data-theme="c" aria-pressed="false">C · 粗野主义</button>
+    <button data-theme="d" aria-pressed="false">D · 极致极简</button>
+  </div>
+
+  <div class="note" id="note"></div>
+
+  <!-- ============ APP 外壳（被对比的真实界面） ============ -->
+  <div class="frame" id="frame" data-theme="a">
+    <div class="shell">
+      <!-- 顶栏 -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand__mark">K</span>
+          <span class="brand__name">Kafka Pilot</span>
+        </div>
+        <span class="vdiv"></span>
+        <span class="lbl">Profile</span>
+        <select class="select" aria-label="选择 Profile">
+          <option>prod</option>
+          <option>staging</option>
+          <option>dev-local</option>
+        </select>
+        <span class="grow"></span>
+        <span class="pill pill--ok">● 在线</span>
+        <span class="port">:18080</span>
+        <span class="actor">unknown</span>
+      </header>
+
+      <!-- 侧边导航 -->
+      <nav class="sidebar" aria-label="主导航">
+        <div class="nav-item is-active" tabindex="0"><span class="ico">▦</span> Topics</div>
+        <div class="nav-item" tabindex="0"><span class="ico">⌕</span> 消息查询</div>
+        <div class="nav-item" tabindex="0"><span class="ico">➤</span> 数据注入</div>
+        <div class="nav-item" tabindex="0"><span class="ico">⧉</span> Consumer Groups</div>
+        <div class="nav-item" tabindex="0"><span class="ico">✦</span> AI 观测区</div>
+        <div class="nav-item" tabindex="0"><span class="ico">⚙</span> 设置</div>
+      </nav>
+
+      <!-- 主内容：Topics 页 -->
+      <main class="main">
+        <div class="page-head reveal">
+          <h2 class="page-title">Topics</h2>
+          <span class="page-sub">集群 <b>prod</b> · 12 个主题 · 6 个分区副本因子 3</span>
+        </div>
+
+        <div class="toolbar reveal">
+          <input class="search" placeholder="搜索主题…" aria-label="搜索主题" />
+          <span class="chip is-on">全部</span>
+          <span class="chip">含审计</span>
+          <span class="chip">含重试</span>
+          <button class="btn btn--primary">刷新</button>
+        </div>
+
+        <section class="card reveal">
+          <div class="card__head">
+            <span>主题列表</span>
+            <span class="page-sub">点击主题名查看分区偏移</span>
+          </div>
+          <div class="card__body">
+            <table>
+              <thead>
+                <tr>
+                  <th>主题</th><th class="num">分区</th><th class="num">副本</th>
+                  <th class="num">最早偏移</th><th class="num">最新偏移</th>
+                  <th class="num">滞后</th><th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="tname">order.events</td><td class="num">6</td><td class="num">3</td>
+                  <td class="num mono">0</td><td class="num mono">9,842,107</td>
+                  <td class="num mono">12,403</td><td><span class="row-act">扫描</span></td>
+                </tr>
+                <tr>
+                  <td class="tname">payment.audit</td><td class="num">3</td><td class="num">3</td>
+                  <td class="num mono">0</td><td class="num mono">2,104,558</td>
+                  <td class="num mono">0</td><td><span class="row-act">扫描</span></td>
+                </tr>
+                <tr>
+                  <td class="tname">user.signup</td><td class="num">3</td><td class="num">2</td>
+                  <td class="num mono">1,204</td><td class="num mono">881,330</td>
+                  <td class="num mono">340</td><td><span class="row-act">扫描</span></td>
+                </tr>
+                <tr>
+                  <td class="tname">clickstream.raw</td><td class="num">12</td><td class="num">3</td>
+                  <td class="num mono">0</td><td class="num mono">44,902,771</td>
+                  <td class="num mono">98,210</td><td><span class="row-act">扫描</span></td>
+                </tr>
+                <tr>
+                  <td class="tname">audit.log</td><td class="num">1</td><td class="num">3</td>
+                  <td class="num mono">0</td><td class="num mono">128,904</td>
+                  <td class="num mono">0</td><td><span class="row-act">扫描</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <pre class="json reveal">{
+  <span class="k">"topic"</span>: <span class="s">"order.events"</span>,
+  <span class="k">"partition"</span>: <span class="n">3</span>,
+  <span class="k">"offset"</span>: <span class="n">9842107</span>,
+  <span class="k">"key"</span>: <span class="s">"order-9f2a1c"</span>,
+  <span class="k">"timestamp"</span>: <span class="n">1762608679000</span>,
+  <span class="k">"headers"</span>: { <span class="k">"source"</span>: <span class="s">"checkout-svc"</span> },
+  <span class="k">"value"</span>: {
+    <span class="k">"orderId"</span>: <span class="s">"9f2a1c"</span>,
+    <span class="k">"amount"</span>: <span class="n">299.00</span>,
+    <span class="k">"currency"</span>: <span class="s">"CNY"</span>,
+    <span class="k">"paid"</span>: <span class="b">true</span>
+  }
+}</pre>
+
+        <div class="status-row reveal">
+          <span class="pill pill--ok">● 已连接</span>
+          <span class="pill pill--err">● 2 个消费者组再均衡</span>
+          <span class="chip is-on">最近扫描 3s 前</span>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <p class="footnote">选型页仅用于风格对比，不修改你的工程代码。确认方向后我们再落地。</p>
+</div>
+
+<script>
+/* 四套风格的定调说明：受众 / 调性 / 字体与配色决策 / 记忆点 */
+const DIRS = {
+  a: {
+    tag: "A · 工业控制台",
+    body: "<b>受众</b>：日常盯集群、查偏移、注入与审计消息的运维 / 后端工程师。<br>" +
+          "<b>调性</b>：仪表盘密度 + 等宽数字 + 发丝边框 + 状态色，像一台冷静的数据控制台。<br>" +
+          "<b>决策</b>：展示字 <b>Archivo</b>（硬朗无衬线），正文 <b>IBM Plex Sans</b>，数字 <b>JetBrains Mono</b>；暗底 <code>#0d0f13</code> + 琥珀强调 <code>#ff9e2c</code>，状态绿/黄/红。顶栏与侧栏用发丝线分隔，背景叠极淡网格。<br>" +
+          "<b>记忆点</b>：琥珀色信号 + 等宽数据列，一眼就是「给工程师用的真工具」，不是 PPT 后台。",
+    meta: "数据密度高、对比强、零装饰噪音 —— 最贴合现有功能，落地成本最低。"
+  },
+  b: {
+    tag: "B · 复古霓虹",
+    body: "<b>受众</b>：喜欢终端美学、把 Kafka 当成「数据流 / 日志」来把玩的开发者。<br>" +
+          "<b>调性</b>：CRT 扫描线 + 霓虹 + 等宽字体 + 网格地平线，致敬 Kafka 的流式 / 终端血统。<br>" +
+          "<b>决策</b>：展示字 <b>Chakra Petch</b>（科技感），正文与数字 <b>JetBrains Mono</b>；近黑底 <code>#070a0f</code> + 霓虹青 <code>#4cc9f0</code>，锐角 2px 圆角，背景叠扫描线 + 底部地平线辉光。<br>" +
+          "<b>记忆点</b>：青色霓虹辉光与扫描线，像一台 80 年代的数据终端，但信息依然清晰可读。",
+    meta: "个性最强、辨识度最高；扫描线需做 reduced-motion 降级，密集表格可读性需额外打磨。"
+  },
+  c: {
+    tag: "C · 粗野主义",
+    body: "<b>受众</b>：想要「不装、直接、有态度」的工具感的团队。<br>" +
+          "<b>调性</b>：裸露粗黑线 + 零圆角 + 硬阴影（无模糊）+ 原生控件感，高对比、不讨好。<br>" +
+          "<b>决策</b>：展示字 <b>Archivo Black</b>（超重），正文 <b>IBM Plex Sans</b>；暖纸底 <code>#f2efe6</code> + 电橙 <code>#ff4d00</code>，边框 2.5px 纯黑，卡片 6px 硬偏移阴影。<br>" +
+          "<b>记忆点</b>：粗黑描边 + 硬阴影 + 单一电橙，像一张被印刷出来的工程图纸，换 Logo 也还是它。",
+    meta: "最「反 AI 味」；但粗线 + 硬阴影在超长表格里会略重，需控制边框密度。"
+  },
+  d: {
+    tag: "D · 极致极简",
+    body: "<b>受众</b>：希望工具「安静、高级、不抢注意力」的使用者。<br>" +
+          "<b>调性</b>：大留白 + 单一强调色 + 精确间距，衬线展示字带来一点编辑感。<br>" +
+          "<b>决策</b>：展示字 <b>Fraunces</b>（衬线，有性格），正文 <b>IBM Plex Sans</b>；暖白 <code>#faf8f4</code> + 陶土红 <code>#d9482b</code> 单一强调，柔和大圆角与浅阴影，背景叠极淡晕染。<br>" +
+          "<b>记忆点</b>：衬线大标题压在暖白留白上、只点一抹陶土红 —— 冷静、克制、像好用的硬件说明书。",
+    meta: "最「贵气」；但极简留白会与高密度数据页（扫描结果、脚本编辑器）产生张力，这类页需单独处理密度。"
+  }
+};
+
+const frame = document.getElementById('frame');
+const note = document.getElementById('note');
+const buttons = document.querySelectorAll('.switcher button');
+
+function applyTheme(t) {
+  frame.setAttribute('data-theme', t);
+  buttons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === t)));
+  const d = DIRS[t];
+  note.innerHTML =
+    '<span class="note__tag">' + d.tag + '</span>' +
+    d.body + '<br><span class="note__meta">▸ ' + d.meta + '</span>';
+  // 重新触发入场编排
+  frame.classList.remove('is-in');
+  void frame.offsetWidth;
+  frame.classList.add('is-in');
+}
+
+buttons.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.theme)));
+applyTheme('a');
+</script>
+</body>
+</html>

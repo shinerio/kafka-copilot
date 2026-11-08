@@ -219,7 +219,7 @@ export function ObservePage() {
   return (
     <div className="kp-fill" style={{ gap: 12 }}>
       <div className="kp-row">
-        <Title3>AI 观测区</Title3>
+        <Title3>CLI 日志</Title3>
         <div className="kp-grow" />
         <Button
           size="small"

@@ -93,6 +93,14 @@ func GenerateOpID() string {
 	return "op_" + strings.ToLower(ulid.Make().String())
 }
 
+// DefaultSessionID is the catch-all session for CLI / manual operations that
+// are not started under an explicit session. It always appears in the CLI log
+// (FR: 没有指定 session 的 CLI 操作统一归类到 default session).
+const DefaultSessionID = "default"
+
+// DefaultSessionLabel is the human-readable label for the catch-all session.
+const DefaultSessionLabel = "默认会话（CLI）"
+
 // OpContext holds metadata for an operation.
 type OpContext struct {
 	OpID      string
@@ -105,6 +113,10 @@ type OpContext struct {
 }
 
 // NewOpContext creates an op context and starts the audit record.
+//
+// Any operation started without an explicit session is folded into the
+// catch-all default session ("default") so it still shows up in the CLI log
+// (FR: 没有指定 session 的 CLI 操作统一归类到 default session).
 func (a *App) NewOpContext(sessionID, source, actor, intent, command string) *OpContext {
 	opID := GenerateOpID()
 	now := time.Now().UnixMilli()
@@ -127,6 +139,22 @@ func (a *App) NewOpContext(sessionID, source, actor, intent, command string) *Op
 		StartedAt:    now,
 		Status:       "running",
 	}
+
+	// Fold ops without an explicit session into the catch-all default session.
+	if op.SessionID == "" {
+		op.SessionID = DefaultSessionID
+	}
+	if op.SessionID == DefaultSessionID {
+		if existing, _ := a.Audit.GetSession(DefaultSessionID); existing != nil {
+			if existing.EndedAt != 0 {
+				_ = a.Audit.ReopenSession(DefaultSessionID)
+			}
+		} else if err := a.Audit.CreateSession(DefaultSessionID, DefaultSessionLabel, now); err != nil {
+			// Non-fatal: the op still records under the default session id.
+			fmt.Fprintf(os.Stderr, "warn: create default session: %v\n", err)
+		}
+	}
+
 	a.Audit.StartOp(op)
 
 	return &OpContext{

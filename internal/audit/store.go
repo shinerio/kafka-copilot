@@ -263,6 +263,18 @@ func (s *Store) EndSession(sessionID string, endedAt int64, auto bool) error {
 	return nil
 }
 
+// ReopenSession clears ended_at so an idle session becomes live again
+// (used to keep the catch-all default session always open for the CLI log).
+func (s *Store) ReopenSession(sessionID string) error {
+	_, err := s.db.Exec(`
+		UPDATE sessions SET ended_at = NULL, auto = 0 WHERE session_id = ?
+	`, sessionID)
+	if err != nil {
+		return fmt.Errorf("reopen session: %w", err)
+	}
+	return nil
+}
+
 // ListSessions lists all sessions.
 func (s *Store) ListSessions(limit int) ([]*Session, error) {
 	if limit <= 0 || limit > 500 {

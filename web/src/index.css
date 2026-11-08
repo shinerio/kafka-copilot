@@ -1,27 +1,43 @@
-/* Kafka Pilot global styles.
-   Fluent UI v9 owns component styling via FluentProvider; this file only
-   adds resets, layout helpers, scrollbars, the progress-bar animation, and
-   the JSON viewer palette. Design tokens follow Fluent 2 (4px radius, 8pt
-   grid, system light theme). */
+/* Kafka Pilot 全局样式 —— 工业控制台 · 圆润高级版（暗色）
+   设计令牌遵循「主色主导 + 单一锐利强调（琥珀）」，60/30/10 分配。
+   圆角 10/14px、柔阴影、渐变光晕氛围；控件统一高度以保证同行对齐；
+   控件与表格单元格统一截断，文字不溢出可用区域。Fluent UI v9 负责组件，
+   本文件补充重置、布局原语、滚动条、进度条、JSON 查看器与各类控件皮肤。 */
 
 :root {
-  --kp-radius: 4px;
-  --kp-radius-lg: 8px;
+  /* 圆角与间距 */
+  --kp-radius: 10px;
+  --kp-radius-lg: 14px;
   --kp-grid: 8px;
-  --kp-font-mono: 'Cascadia Code', 'Fira Code', Consolas, 'SF Mono', Menlo,
+  /* 统一控件高度：同行输入框 / 按钮对齐的关键 */
+  --kp-control-h: 36px;
+
+  --kp-font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, 'SF Mono', Menlo,
     monospace;
-  --kp-bg: #ffffff;
-  --kp-bg-alt: #fafafa;
-  --kp-border: #e0e0e0;
-  --kp-border-strong: #c8c8c8;
-  --kp-text: #1a1a1a;
-  --kp-text-secondary: #595959;
-  --kp-text-tertiary: #8a8a8a;
-  --kp-accent: #0f6cbd;
-  --kp-success: #107c10;
-  --kp-warning: #9b5300;
-  --kp-danger: #c4314b;
-  --kp-running: #0f6cbd;
+
+  /* 工业暗色 · 圆润高级调色板 */
+  --kp-bg: #0d1117;
+  --kp-bg-alt: #121821;
+  --kp-surface: #151b24;
+  --kp-surface-2: #1b232e;
+  --kp-border: rgba(255, 255, 255, 0.09);
+  --kp-border-strong: rgba(255, 255, 255, 0.16);
+  --kp-text: #e7ebf1;
+  --kp-text-secondary: #9aa4b2;
+  --kp-text-tertiary: #6b7480;
+  --kp-accent: #ff9f43;
+  --kp-accent-hover: #ffb362;
+  --kp-accent-ink: #1a1206;
+  --kp-success: #3fb950;
+  --kp-warning: #e3b341;
+  --kp-danger: #ff6b6b;
+  --kp-running: #ff9f43;
+
+  /* 柔阴影（带环境色，非纯黑） */
+  --kp-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --kp-shadow-2: 0 10px 30px rgba(0, 0, 0, 0.45);
+  /* 琥珀聚焦光环 */
+  --kp-glow: 0 0 0 3px rgba(255, 159, 67, 0.22);
 }
 
 * {
@@ -37,37 +53,45 @@ body,
 }
 
 body {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica,
-    Arial, sans-serif;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, Helvetica, Arial, sans-serif;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--kp-text);
   background: var(--kp-bg);
+  /* 渐变光晕氛围：右上琥珀辉光 + 左下冷调补光，固定不随滚动 */
+  background-image:
+    radial-gradient(60rem 40rem at 86% -12%, rgba(255, 159, 67, 0.10), transparent 60%),
+    radial-gradient(52rem 42rem at -4% 104%, rgba(64, 132, 220, 0.07), transparent 55%);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Thin, modern scrollbars */
+/* 圆润现代滚动条 */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--kp-border-strong) transparent;
 }
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 *::-webkit-scrollbar-thumb {
   background: var(--kp-border-strong);
-  border-radius: 4px;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover {
   background: var(--kp-text-tertiary);
+  background-clip: padding-box;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* Layout primitives */
+/* 布局原语 */
 .kp-fill {
   display: flex;
   flex-direction: column;
@@ -75,8 +99,14 @@ body {
 }
 .kp-row {
   display: flex;
-  align-items: center;
+  align-items: center; /* 同行控件垂直居中对齐 */
   gap: var(--kp-grid);
+}
+.kp-toolbar {
+  display: flex;
+  align-items: center; /* 输入框与按钮同行对齐 */
+  gap: var(--kp-grid);
+  flex-wrap: wrap;
 }
 .kp-col {
   display: flex;
@@ -104,30 +134,31 @@ body {
   white-space: nowrap;
 }
 
-/* Card surface */
+/* 卡片表面（圆润高级：大圆角 + 柔阴影 + 发丝边） */
 .kp-card {
-  background: var(--kp-bg);
+  background: var(--kp-surface);
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius-lg);
   padding: 16px;
+  box-shadow: var(--kp-shadow-2);
 }
 .kp-card + .kp-card {
   margin-top: var(--kp-grid);
 }
 
-/* Progress bar (div + CSS animation, per spec) */
+/* 进度条（div + CSS 动画） */
 .kp-progress {
   height: 8px;
   width: 100%;
   background: var(--kp-bg-alt);
-  border-radius: var(--kp-radius);
+  border-radius: 999px;
   overflow: hidden;
   border: 1px solid var(--kp-border);
 }
 .kp-progress__bar {
   height: 100%;
   background: var(--kp-accent);
-  border-radius: var(--kp-radius);
+  border-radius: 999px;
   transition: width 0.25s ease;
 }
 .kp-progress__bar--indeterminate {
@@ -143,12 +174,12 @@ body {
   }
 }
 
-/* JSON viewer */
+/* JSON 查看器（暗色语法配色） */
 .kp-json {
   font-family: var(--kp-font-mono);
   font-size: 12.5px;
   line-height: 1.6;
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius);
   padding: 12px;
@@ -159,64 +190,68 @@ body {
   margin: 0;
 }
 .kp-json__key {
-  color: #0f6cbd;
+  color: var(--kp-accent);
 }
 .kp-json__string {
-  color: #107c10;
+  color: #7ee787;
 }
 .kp-json__number {
-  color: #9b5300;
+  color: var(--kp-warning);
 }
 .kp-json__bool {
-  color: #c4314b;
+  color: #ff7b72;
 }
 .kp-json__null {
-  color: #8a8a8a;
+  color: var(--kp-text-tertiary);
 }
 
-/* Status pills */
+/* 状态药丸（圆润胶囊） */
 .kp-pill {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   line-height: 18px;
   border: 1px solid transparent;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .kp-pill--ok {
-  background: #dff6dd;
-  color: #0b6a0b;
-  border-color: #9bd89b;
+  background: rgba(63, 185, 80, 0.16);
+  color: #56d364;
+  border-color: rgba(63, 185, 80, 0.4);
 }
 .kp-pill--running {
-  background: #e6f1fb;
-  color: #0f548a;
-  border-color: #9bbde6;
+  background: rgba(255, 159, 67, 0.16);
+  color: var(--kp-accent);
+  border-color: rgba(255, 159, 67, 0.4);
 }
 .kp-pill--error {
-  background: #fde7e9;
-  color: #a4262c;
-  border-color: #f0b8bc;
+  background: rgba(255, 107, 107, 0.16);
+  color: #ff8a8a;
+  border-color: rgba(255, 107, 107, 0.4);
 }
 .kp-pill--warning {
-  background: #fff4ce;
-  color: #8a5400;
-  border-color: #f5d77a;
+  background: rgba(227, 179, 65, 0.16);
+  color: var(--kp-warning);
+  border-color: rgba(227, 179, 65, 0.4);
 }
 .kp-pill--muted {
-  background: #f0f0f0;
-  color: #595959;
-  border-color: #d0d0d0;
+  background: var(--kp-surface-2);
+  color: var(--kp-text-secondary);
+  border-color: var(--kp-border);
 }
 
 /* Spinner */
 .kp-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid var(--kp-border);
+  border: 2px solid var(--kp-border-strong);
   border-top-color: var(--kp-accent);
   border-radius: 50%;
   animation: kp-spin 0.7s linear infinite;
@@ -227,7 +262,7 @@ body {
   }
 }
 
-/* Table cell helpers */
+/* 表格数字与等宽单元格 */
 .kp-cell-numeric {
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -237,26 +272,39 @@ body {
   font-size: 12.5px;
 }
 
-/* Form field label */
+/* 表单字段标签 */
 .kp-field-label {
   font-size: 12px;
   color: var(--kp-text-secondary);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-weight: 500;
 }
 
-/* Searchable combobox (TopicSelect / PartitionMultiSelect) */
+/* 通用控件焦点光环（圆润高级的关键细节） */
+.kp-select:focus-visible,
+.kp-datetime:focus-visible,
+.kp-combo:focus-within,
+.kp-btn:focus-visible,
+.kp-combo__input:focus-visible {
+  outline: none;
+  border-color: var(--kp-accent);
+  box-shadow: var(--kp-glow);
+}
+
+/* 搜索 / 下拉组合框（TopicSelect / PartitionMultiSelect） */
 .kp-combo {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 32px;
+  height: var(--kp-control-h);
   padding: 0 10px;
   border: 1px solid var(--kp-border-strong);
   border-radius: var(--kp-radius);
-  background: #fff;
+  background: var(--kp-surface);
   cursor: pointer;
   min-width: 0;
+  max-width: 100%;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .kp-combo:focus-within {
   border-color: var(--kp-accent);
@@ -264,28 +312,32 @@ body {
 .kp-combo__input {
   flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
   border: none;
   outline: none;
   font-size: 13px;
   background: transparent;
   color: var(--kp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .kp-combo__panel {
   position: absolute;
   z-index: 50;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
   max-height: 260px;
   overflow-y: auto;
-  background: #fff;
+  background: var(--kp-surface);
   border: 1px solid var(--kp-border-strong);
   border-radius: var(--kp-radius);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  padding: 4px;
+  box-shadow: var(--kp-shadow-2);
+  padding: 6px;
 }
 .kp-combo__item {
-  padding: 7px 10px;
+  padding: 8px 10px;
   border-radius: var(--kp-radius);
   font-size: 13px;
   cursor: pointer;
@@ -294,10 +346,10 @@ body {
   text-overflow: ellipsis;
 }
 .kp-combo__item:hover {
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
 }
 .kp-combo__item--active {
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
   font-weight: 600;
   color: var(--kp-accent);
 }
@@ -312,50 +364,58 @@ body {
   accent-color: var(--kp-accent);
 }
 
-/* Native datetime-local picker */
+/* 原生 datetime-local 选择器 */
 .kp-datetime {
-  height: 32px;
+  height: var(--kp-control-h);
   padding: 0 10px;
   border: 1px solid var(--kp-border-strong);
   border-radius: var(--kp-radius);
-  background: #fff;
+  background: var(--kp-surface);
   font-size: 13px;
   color: var(--kp-text);
   width: 100%;
+  max-width: 100%;
 }
 .kp-datetime:focus {
   outline: none;
   border-color: var(--kp-accent);
 }
 
-/* Partition offset chips (Topics page) */
+/* 分区偏移胶囊（Topics 页） */
 .kp-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 999px;
   font-size: 12px;
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
   border: 1px solid var(--kp-border);
   font-variant-numeric: tabular-nums;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .kp-chip b {
   color: var(--kp-accent);
 }
 
-/* Native select — used instead of Fluent Dropdown (popup render crash fix) */
+/* 原生 select —— 替代 Fluent Dropdown（弹层崩溃修复） */
 .kp-select {
-  height: 30px;
-  padding: 0 8px;
+  height: var(--kp-control-h);
+  padding: 0 10px;
   border: 1px solid var(--kp-border-strong);
   border-radius: var(--kp-radius);
-  background: #fff;
+  background: var(--kp-surface);
   color: var(--kp-text);
   font: inherit;
   font-size: 13px;
   min-width: 0;
+  max-width: 100%;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .kp-select:hover {
   border-color: var(--kp-accent);
@@ -363,34 +423,35 @@ body {
 .kp-select:focus {
   outline: none;
   border-color: var(--kp-accent);
-  box-shadow: 0 0 0 1px var(--kp-accent);
+  box-shadow: var(--kp-glow);
 }
 .kp-select:disabled {
   background: var(--kp-bg-alt);
+  color: var(--kp-text-tertiary);
   cursor: not-allowed;
 }
 
-/* Dropdown surface rendered through a portal: never clipped by page overflow */
+/* 下拉面板经 portal 渲染，永不被页面 overflow 裁剪 */
 .kp-combo__tools {
   position: sticky;
-  top: -4px;
+  top: -6px;
   z-index: 1;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 6px;
-  background: #fff;
+  padding: 6px 6px;
+  background: var(--kp-surface);
   border-bottom: 1px solid var(--kp-border);
   font-size: 12px;
 }
 .kp-combo__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 2px;
-  padding: 4px;
+  gap: 4px;
+  padding: 6px;
 }
 .kp-combo__grid .kp-combo__item {
-  padding: 5px 6px;
+  padding: 6px 8px;
 }
 .kp-linkbtn {
   border: none;
@@ -398,12 +459,13 @@ body {
   color: var(--kp-accent);
   font-size: 12px;
   cursor: pointer;
-  padding: 2px 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
   font-family: inherit;
   white-space: nowrap;
 }
 .kp-linkbtn:hover {
-  text-decoration: underline;
+  background: var(--kp-surface-2);
 }
 .kp-datetime-row {
   display: flex;
@@ -414,7 +476,7 @@ body {
   flex: 1 1 auto;
 }
 
-/* Fixed table layout (Topics page: give offsets most of the width) */
+/* 固定表格布局：列宽由拖拽列脚本控制，单元格截断不溢出 */
 .kp-table-fixed {
   table-layout: fixed;
   width: 100%;
@@ -423,15 +485,16 @@ body {
 .kp-table-fixed td {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Error boundary fallback */
+/* 错误边界兜底 */
 .kp-error-boundary {
   margin: 16px;
   padding: 20px;
   border: 1px solid var(--kp-danger);
   border-radius: var(--kp-radius-lg);
-  background: #fff7f8;
+  background: rgba(255, 107, 107, 0.08);
 }
 .kp-error-boundary h3 {
   margin: 0 0 8px;
@@ -440,28 +503,52 @@ body {
   white-space: pre-wrap;
   font-family: var(--kp-font-mono);
   font-size: 12px;
-  color: var(--kp-danger);
+  color: #ff8a8a;
 }
+
+/* 主按钮（圆润高级：统一高度 + 琥珀实心 + 悬停提亮） */
 .kp-btn {
-  height: 30px;
-  padding: 5px 14px;
+  height: var(--kp-control-h);
+  padding: 0 16px;
   border: 1px solid var(--kp-border-strong);
   border-radius: var(--kp-radius);
-  background: #fff;
+  background: var(--kp-surface);
+  color: var(--kp-text);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease;
 }
 .kp-btn:hover {
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
+  border-color: var(--kp-accent);
+}
+.kp-btn:active {
+  transform: translateY(1px);
+}
+.kp-btn--primary {
+  background: var(--kp-accent);
+  color: var(--kp-accent-ink);
+  border-color: var(--kp-accent);
+  font-weight: 600;
+}
+.kp-btn--primary:hover {
+  background: var(--kp-accent-hover);
+  border-color: var(--kp-accent-hover);
 }
 
-/* Resizable table columns (attached to every <th> by useResizableTables) */
+/* 可拖拽列（每个 <th> 由 useResizableTables 挂载握把）
+   圆润高级：更宽的命中区 + 琥珀渐显握把 */
 .kp-col-resizer {
   position: absolute;
   top: 0;
   right: 0;
-  width: 8px;
+  width: 12px;
   height: 100%;
   cursor: col-resize;
   z-index: 4;
@@ -471,13 +558,14 @@ body {
 .kp-col-resizer::after {
   content: '';
   position: absolute;
-  right: 2px;
-  top: 22%;
-  height: 56%;
+  right: 5px;
+  top: 30%;
+  height: 40%;
   width: 2px;
   border-radius: 2px;
   background: var(--kp-border-strong);
   opacity: 0.55;
+  transition: background 0.15s ease, opacity 0.15s ease, width 0.15s ease;
 }
 th:hover .kp-col-resizer::after {
   opacity: 1;
@@ -494,12 +582,7 @@ body.kp-col-resizing * {
   user-select: none !important;
 }
 
-/* Fixed backscan options (Scan page): native radio group, five presets.
-   Native inputs are used deliberately — Fluent Dropdown previously caused
-   a full-page crash, and radios need no portal/popover.
-   The row sits OUTSIDE the auto-fit grid: a single 180px grid column wraps
-   the five presets onto two rows, while a grid-column span on a Fluent Field
-   mis-places it and overlaps the Topic combobox. */
+/* 固定回溯选项（Scan 页）：原生单选组，五个预设 */
 .kp-last-row {
   display: flex;
   align-items: center;
@@ -520,19 +603,19 @@ body.kp-col-resizing * {
   flex-wrap: wrap;
   align-items: center;
   gap: 3px;
-  min-height: 32px;
+  min-height: var(--kp-control-h);
   padding: 3px 4px;
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius);
-  background: var(--kp-bg);
+  background: var(--kp-surface);
 }
 .kp-last-radio {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
+  padding: 3px 8px;
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: 8px;
   font-size: 12px;
   line-height: 20px;
   color: var(--kp-text-secondary);
@@ -541,12 +624,12 @@ body.kp-col-resizing * {
   user-select: none;
 }
 .kp-last-radio:hover {
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
   color: var(--kp-text);
 }
 .kp-last-radio.is-checked {
   border-color: var(--kp-accent);
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
   color: var(--kp-accent);
   font-weight: 600;
 }
@@ -566,9 +649,7 @@ body.kp-col-resizing * {
   font-size: 12px;
 }
 
-/* Script batch editor + inline call-rule card (Produce page, FR-07).
-   The editor is a plain textarea on purpose: users paste or edit JS directly,
-   no file picker and no client-side path handling. */
+/* 脚本批量编辑器 + 内联调用规则卡（Produce 页） */
 .kp-code-editor {
   display: block;
   width: 100%;
@@ -588,8 +669,9 @@ body.kp-col-resizing * {
   tab-size: 2;
 }
 .kp-code-editor:focus-visible {
-  outline: 2px solid var(--kp-accent);
-  outline-offset: 1px;
+  outline: none;
+  border-color: var(--kp-accent);
+  box-shadow: var(--kp-glow);
 }
 .kp-code-editor::placeholder {
   color: var(--kp-text-tertiary);
@@ -597,7 +679,7 @@ body.kp-col-resizing * {
 .kp-script-rules {
   margin-top: 12px;
   padding: 12px 14px;
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface);
   border: 1px solid var(--kp-border);
   border-left: 3px solid var(--kp-accent);
   border-radius: var(--kp-radius);
@@ -640,9 +722,7 @@ body.kp-col-resizing * {
   font-weight: 600;
 }
 
-/* Produce page: let the main pane scroll instead of clipping the card.
-   Fluent UI Card defaults to overflow:hidden and .kp-fill pins height:100%,
-   which together used to clip ~1250px of content with no scrollbar. */
+/* Produce 页：主面板滚动而非裁剪卡片 */
 .kp-fill--produce {
   height: auto;
   min-height: 100%;
@@ -652,12 +732,11 @@ body.kp-col-resizing * {
   min-height: 100%;
 }
 .kp-card.kp-card--batch {
-  /* Fluent injects its own overflow:hidden class at runtime; override it so
-     the sticky action bar can stick to the scrolling main pane. */
+  /* Fluent 运行时注入 overflow:hidden；覆盖以让粘性操作栏可贴住滚动主区 */
   overflow: visible !important;
 }
 
-/* Batch actions stay reachable while reading the long reference cards. */
+/* 批量操作栏在长参考卡常驻可达 */
 .kp-batch-actions {
   position: sticky;
   top: 0;
@@ -677,11 +756,11 @@ body.kp-col-resizing * {
   color: var(--kp-text-tertiary);
 }
 
-/* ctx API quick reference (script batch produce page) */
+/* ctx API 速查（脚本批量生产页） */
 .kp-ctx-panel {
   margin-top: 12px;
   padding: 12px 14px;
-  background: var(--kp-bg);
+  background: var(--kp-surface);
   border: 1px solid var(--kp-border);
   border-left: 3px solid var(--kp-success);
   border-radius: var(--kp-radius);
@@ -727,8 +806,8 @@ body.kp-col-resizing * {
 }
 .kp-ctx-panel code {
   padding: 1px 4px;
-  border-radius: 3px;
-  background: var(--kp-bg-alt);
+  border-radius: 6px;
+  background: var(--kp-surface-2);
   border: 1px solid var(--kp-border);
   font-family: var(--kp-font-mono);
   font-size: 11.5px;
@@ -741,8 +820,8 @@ body.kp-col-resizing * {
 .kp-ctx-type {
   display: inline-block;
   padding: 1px 6px;
-  border-radius: 3px;
-  background: #eef5fc;
+  border-radius: 6px;
+  background: rgba(255, 159, 67, 0.16);
   color: var(--kp-accent);
   font-family: var(--kp-font-mono);
   font-size: 11px;
@@ -765,7 +844,7 @@ body.kp-col-resizing * {
   overflow-wrap: anywhere;
 }
 .kp-ctx-table th {
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface-2);
   color: var(--kp-text);
   font-weight: 600;
   white-space: nowrap;
@@ -799,7 +878,7 @@ body.kp-col-resizing * {
 }
 .kp-ctx-note {
   padding: 10px 12px;
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface);
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius);
 }
@@ -837,7 +916,7 @@ body.kp-col-resizing * {
   align-items: flex-start;
   gap: 6px;
   padding: 10px 12px;
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface);
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius);
   font-size: 12px;
@@ -854,7 +933,7 @@ body.kp-col-resizing * {
   display: block;
   width: 100%;
   padding: 6px 8px !important;
-  background: var(--kp-bg) !important;
+  background: var(--kp-bg-alt) !important;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.5;
@@ -866,7 +945,7 @@ body.kp-col-resizing * {
   }
 }
 
-/* Result-set partition filter (scan results: all partitions are returned) */
+/* 结果集分区过滤（扫描结果：返回全部分区） */
 .kp-result-pfilter {
   display: flex;
   align-items: center;
@@ -876,7 +955,7 @@ body.kp-col-resizing * {
   padding: 6px 8px;
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius);
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface);
 }
 .kp-result-pfilter__label {
   margin-right: 4px;
@@ -888,10 +967,10 @@ body.kp-col-resizing * {
 .kp-result-pfilter__chip {
   display: inline-flex;
   align-items: center;
-  padding: 3px 9px;
+  padding: 3px 10px;
   border: 1px solid transparent;
   border-radius: 999px;
-  background: var(--kp-bg);
+  background: var(--kp-surface-2);
   color: var(--kp-text-secondary);
   font: inherit;
   font-size: 12px;
@@ -906,7 +985,7 @@ body.kp-col-resizing * {
 }
 .kp-result-pfilter__chip.is-active {
   border-color: var(--kp-accent);
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface);
   color: var(--kp-accent);
   font-weight: 600;
 }
@@ -915,14 +994,13 @@ body.kp-col-resizing * {
   font-size: 12px;
 }
 
-/* Explicit key-location switch on the scan page (FR-05).
-   Off by default; the risk card is deliberately always visible when on. */
+/* 显式键定位开关（Scan 页）。默认关；开启时常驻风险卡 */
 .kp-keyloc {
   margin-top: 12px;
   padding: 10px 12px;
   border: 1px solid var(--kp-border);
   border-radius: var(--kp-radius);
-  background: var(--kp-bg-alt);
+  background: var(--kp-surface);
 }
 .kp-keyloc__row {
   display: flex;
@@ -957,7 +1035,7 @@ body.kp-col-resizing * {
   padding: 3px 10px;
   border: 1px solid var(--kp-accent);
   border-radius: 999px;
-  background: var(--kp-bg);
+  background: var(--kp-surface);
   color: var(--kp-accent);
   font-family: var(--kp-font-mono);
   font-size: 12.5px;
@@ -968,8 +1046,8 @@ body.kp-col-resizing * {
   max-width: 100%;
   padding: 2px 6px;
   border: 1px solid var(--kp-border);
-  border-radius: 4px;
-  background: var(--kp-bg);
+  border-radius: 8px;
+  background: var(--kp-surface);
   font-family: var(--kp-font-mono);
   font-size: 11.5px;
   white-space: nowrap;
@@ -979,8 +1057,8 @@ body.kp-col-resizing * {
   margin-top: 10px;
   padding: 8px 10px;
   border-left: 3px solid var(--kp-warning);
-  border-radius: 4px;
-  background: var(--kp-bg);
+  border-radius: 8px;
+  background: var(--kp-surface);
   color: var(--kp-text-secondary);
   font-size: 12px;
   line-height: 1.65;
@@ -997,7 +1075,6 @@ body.kp-col-resizing * {
 .kp-keyloc__risk li {
   margin: 2px 0;
 }
-/* While the switch is on, the partition picker is display-only. */
 .kp-keyloc__locked {
   pointer-events: none;
   opacity: 0.6;
@@ -1006,8 +1083,8 @@ body.kp-col-resizing * {
   margin-top: 8px;
   padding: 6px 10px;
   border: 1px solid var(--kp-border);
-  border-radius: 4px;
-  background: var(--kp-bg-alt);
+  border-radius: 8px;
+  background: var(--kp-surface);
   color: var(--kp-text-secondary);
   font-size: 12px;
   line-height: 1.6;
@@ -1016,3 +1093,140 @@ body.kp-col-resizing * {
   color: var(--kp-warning);
 }
 
+/* 通用表格：限制单元格最大宽度并允许长内容换行，避免横向溢出 */
+main table {
+  width: 100%;
+}
+main table td {
+  max-width: 360px;
+  overflow-wrap: anywhere;
+}
+
+/* =========================================================================
+   控件与表格美化（工业暗色 · 圆润高级）
+   目标：输入框 / 选择框 / 表格等常见控件统一气质，文字不溢出，聚焦有琥珀光环。
+   ========================================================================= */
+
+/* 原生控件随系统走暗色（select 选项面板 / datetime 选择器 / 滚动条） */
+:root {
+  color-scheme: dark;
+}
+
+/* ---- 表格：吸顶表头 + 次级表面 + 斑马纹 + 悬停高亮 + 圆角裁切 ---- */
+/* 仅作用于 Fluent Table（main 内），排除已独立排版的 .kp-ctx-table */
+main table:not(.kp-ctx-table) {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+main table:not(.kp-ctx-table) thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--kp-surface-2);
+  color: var(--kp-text-secondary);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+  text-align: left;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--kp-border-strong);
+  white-space: nowrap;
+  user-select: none;
+}
+main table:not(.kp-ctx-table) tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--kp-border);
+  color: var(--kp-text);
+  vertical-align: top;
+}
+/* 极淡斑马纹，长表更易跟踪行 */
+main table:not(.kp-ctx-table) tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.018);
+}
+/* 行悬停：琥珀微染，呼应强调色 */
+main table:not(.kp-ctx-table) tbody tr:hover td {
+  background: rgba(255, 159, 67, 0.07);
+}
+/* 首末行圆角，配合外层 overflow:hidden 裁切 */
+main table:not(.kp-ctx-table) thead th:first-child {
+  border-top-left-radius: var(--kp-radius);
+}
+main table:not(.kp-ctx-table) thead th:last-child {
+  border-top-right-radius: var(--kp-radius);
+}
+main table:not(.kp-ctx-table) tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---- 原生 select：去掉默认箭头，换琥珀/中性定制箭头 + 暗色面板（color-scheme）---- */
+.kp-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%239aa4b2' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+}
+.kp-select:hover {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%23ff9f43' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* ---- Fluent Input / Textarea：暗色占位符 + 统一字体 ---- */
+main input::placeholder,
+main textarea::placeholder {
+  color: var(--kp-text-tertiary);
+  opacity: 1;
+}
+main textarea:not(.kp-code-editor) {
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  font-family: var(--kp-font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--kp-text);
+  background: var(--kp-surface);
+  border: 1px solid var(--kp-border-strong);
+  border-radius: var(--kp-radius);
+  resize: vertical;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+main textarea:not(.kp-code-editor):focus-visible {
+  outline: none;
+  border-color: var(--kp-accent);
+  box-shadow: var(--kp-glow);
+}
+
+/* ---- 复选 / 单选：统一琥珀强调 ---- */
+main input[type='checkbox'],
+main input[type='radio'] {
+  accent-color: var(--kp-accent);
+  cursor: pointer;
+}
+
+/* ---- Fluent Button：焦点琥珀光环（主题 colorStrokeFocus 已在 App.tsx 设置）---- */
+main button:not(.kp-btn):not(.kp-linkbtn):focus-visible {
+  outline: 2px solid var(--kp-accent);
+  outline-offset: 2px;
+}
+
+/* ---- 自定义控件：加一抹顶部高光，更显高级 ---- */
+.kp-select,
+.kp-combo,
+.kp-datetime {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.kp-btn {
+  box-shadow: var(--kp-shadow-1);
+}
+/* 主按钮：琥珀渐变 + 柔和投影，按下更沉 */
+.kp-btn--primary {
+  background: linear-gradient(180deg, #ffb362 0%, var(--kp-accent) 100%);
+  box-shadow: 0 2px 10px rgba(255, 159, 67, 0.28);
+}
+.kp-btn--primary:hover {
+  background: linear-gradient(180deg, #ffc07d 0%, var(--kp-accent-hover) 100%);
+}

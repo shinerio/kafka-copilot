@@ -3,7 +3,13 @@
 // status) and switches between page components. Theme comes from Fluent UI
 // v9 webLightTheme; per-page details live in src/pages/*.
 
-import { FluentProvider, webLightTheme, Toaster, makeStyles } from '@fluentui/react-components'
+import {
+  FluentProvider,
+  webDarkTheme,
+  Toaster,
+  makeStyles,
+  type Theme,
+} from '@fluentui/react-components'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Layout } from './components/Layout'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -29,6 +35,43 @@ const useStyles = makeStyles({
 // In production build the Go server serves both UI and /api on the same port,
 // so we display the dev proxy port only as an informational hint.
 const DEV_PROXY_PORT = 18080
+
+// 工业控制台暗色主题：Fluent 中性色对齐 index.css 的 --kp-* 暗色调色板，
+// 品牌色改为琥珀（对齐 --kp-accent），外壳（顶栏/侧栏/卡片）随主题自动变暗。
+const kpTheme: Theme = {
+  ...webDarkTheme,
+  colorNeutralBackground1: '#151b24',
+  colorNeutralBackground2: '#0d1117',
+  colorNeutralBackground3: '#1b232e',
+  colorNeutralBackground4: '#222a34',
+  colorNeutralBackgroundInverted: '#e7ebf1',
+  colorNeutralForeground1: '#e7ebf1',
+  colorNeutralForeground2: '#9aa4b2',
+  colorNeutralForeground3: '#6b7480',
+  colorNeutralForeground4: '#5c6470',
+  colorNeutralStroke1: 'rgba(255,255,255,0.09)',
+  colorNeutralStroke2: 'rgba(255,255,255,0.08)',
+  colorNeutralStrokeAccessible: 'rgba(255,255,255,0.18)',
+  colorBrandBackground: '#ff9f43',
+  colorBrandBackgroundHover: '#ffb362',
+  colorBrandBackgroundPressed: '#ffa64d',
+  colorBrandForeground1: '#ff9f43',
+  colorBrandForeground2: '#ffb362',
+  colorBrandForeground2Hover: '#ffc07d',
+  colorBrandForeground2Pressed: '#ffb362',
+  colorBrandBackground2: 'rgba(255,159,67,0.16)',
+  colorBrandBackground2Hover: 'rgba(255,159,67,0.24)',
+  colorBrandBackground2Pressed: 'rgba(255,159,67,0.24)',
+  // 圆角令牌：让所有 Fluent 控件（输入框 / 按钮 / 卡片）统一变圆滑高级
+  borderRadiusSmall: '8px',
+  borderRadiusMedium: '10px',
+  borderRadiusLarge: '14px',
+  borderRadiusXLarge: '18px',
+  borderRadiusCircular: '999px',
+  // 聚焦描边改为琥珀，跨所有 Fluent 控件统一焦点光环
+  colorStrokeFocus1: '#ff9f43',
+  colorCompoundBrandStroke: 'rgba(255,159,67,0.55)',
+}
 
 export default function App() {
   const styles = useStyles()
@@ -117,7 +160,7 @@ export default function App() {
   }, [page, activeProfile, profiles, refreshProfiles])
 
   return (
-    <FluentProvider theme={webLightTheme} className={styles.root}>
+    <FluentProvider theme={kpTheme} className={styles.root}>
       <ErrorBoundary label="应用外壳">
         <Layout
           page={page}

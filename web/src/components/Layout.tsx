@@ -16,7 +16,7 @@ import {
   DataUsageRegular,
   RocketRegular,
   TabDesktopMultipleRegular,
-  BotRegular,
+  DocumentTextRegular,
   SettingsRegular,
   PlugConnectedRegular,
 } from '@fluentui/react-icons'
@@ -43,7 +43,7 @@ const NAV: NavItem[] = [
   { key: 'scan', label: '消息查询', icon: <TabDesktopMultipleRegular /> },
   { key: 'produce', label: '数据注入', icon: <RocketRegular /> },
   { key: 'groups', label: 'Consumer Groups', icon: <PlugConnectedRegular /> },
-  { key: 'observe', label: 'AI 观测区', icon: <BotRegular /> },
+  { key: 'observe', label: 'CLI 日志', icon: <DocumentTextRegular /> },
   { key: 'settings', label: '设置', icon: <SettingsRegular /> },
 ]
 

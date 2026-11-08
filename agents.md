@@ -99,15 +99,16 @@ kafka-pilot/
 
 ```
 GET  /api/health
-GET/POST/PUT/DELETE /api/profiles[/...]       # profile 管理（含 /default、/{name}）
+GET/POST/PUT/DELETE /api/profiles[/...]       # profile 管理（含 /default、/{name}、PUT 更新已有 profile）
 GET  /api/topics  GET /api/topics/{topic}
 GET  /api/key-partition                          # 仅算 key 落点，不扫描
-POST /api/scan
+POST /api/scan                                   # 支持 last / 时间窗 / offset_from-offset_to / key / key_regex / keyword / expr / ignore_case / key_partition
 POST /api/produce  POST /api/produce/batch
 GET  /api/groups  GET /api/groups/{group}/lag
-GET  /api/sessions[/{id}]  DELETE /api/sessions
+GET  /api/sessions[/{id}]  DELETE /api/sessions  # 浏览 / 详情 / 批量删除（会话「新建 / 结束」为 CLI 专属，见 §5.9）
 GET  /api/audit/ops[/{op_id}][/snapshot]  DELETE /api/audit/ops  DELETE /api/audit
 GET  /api/audit/stream                         # SSE 实时推送
+GET  /api/schema                               # 机器可读：命令清单 + 退出码（对应 CLI 的 kp schema）
 ```
 
 ---
@@ -179,6 +180,10 @@ cd web && npm run lint                 # oxlint 前端静态检查
 6. **脚本沙箱（goja）**：`ctx` 仅 `index / time / random() / uuid() / pick()` 五个成员；无 `console` / `require` / `fetch` / `setTimeout`；编译与每次 `generate(ctx)` 调用各享 5s 预算；`value` **必须是字符串**（对象需用 `JSON.stringify`）。
 7. **本地服务无认证鉴权**：这是定位（本地单机工具），但 Kafka 连接的 SASL / TLS 仍按 profile 配置。
 8. **架构图经 drawio MCP 维护**：`docs/figures/1~5` 与 `kafka-pilot-架构图.drawio` 的读取 / 修改必须走 drawio MCP，禁止手改 XML；改动后重新导出 PNG。
+9. **明确「CLI 专属」能力，不算双端缺口**：以下能力刻意只走 CLI，不进 REST / Web UI，**不要为了「一致」而补 REST 端点**，也不要在 Web UI 加对应入口：
+   - 会话的「新建 / 结束」（`kp session new` / `kp session end`）—— 供 AI Agent 在任务开始前开会话、结束时收尾，人类在 Web 观测区无需此操作。
+   - 服务生命周期（`kp serve` / `desktop` / `stop` / `restart`）—— 进程管理，REST 服务本身就是被管理对象。
+   - 其余能力（profile / topic / group / scan / produce / audit / key-partition 等）必须 **CLI 与 REST 完全对称**：任一侧有的能力，另一侧也要有。
 
 ---
 
@@ -199,6 +204,7 @@ cd web && npm run lint                 # oxlint 前端静态检查
 
 > 本纪律是本项目开发的第一红线：**开发即要更新文档；能力变化即要更新 skill。**
 
+- **CLI 与 Web（REST）能力必须双向对称（第一红线前的硬约束）**：新增或改动任何「非 CLI 专属」（见 §5.9）的能力时，**必须同时在 `internal/app` + CLI(`cmd/kp`) + REST(`internal/serve`) 三处落地**，并保证三者语义、字段、退出码一致；Web UI 只是 REST 的消费者，自然随之具备同等能力。任何一侧独有的能力都视为缺陷，需补齐，不得任其漂移。
 - **技术文档必须随代码同步更新**。功能新增、行为变更、bug 修复落地后，不得只改代码不更文档。
   - 设计文档遵循既有「变更记录」表格，新增一行：`版本号 · 日期 · 变更摘要 · 备注（用户反馈 / 自查）`。
   - 架构图变更走 drawio MCP 重新导出 PNG，保证图文一致。

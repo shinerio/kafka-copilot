@@ -61,6 +61,7 @@ func main() {
 		newSessionCmd(),
 		newAuditCmd(),
 		newSchemaCmd(),
+		newKeyPartitionCmd(),
 		newServeCmd(),
 		newDesktopCmd(),
 		newStopCmd(),
@@ -132,7 +133,7 @@ func newProfileCmd() *cobra.Command {
 		Use:   "profile",
 		Short: "Manage connection profiles",
 	}
-	cmd.AddCommand(profileListCmd(), profileAddCmd(), profileUseCmd(), profileShowCmd(), profileRemoveCmd())
+	cmd.AddCommand(profileListCmd(), profileAddCmd(), profileUseCmd(), profileShowCmd(), profileRemoveCmd(), profileUpdateCmd())
 	return cmd
 }
 
@@ -252,6 +253,59 @@ func profileRemoveCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func profileUpdateCmd() *cobra.Command {
+	var (
+		bootstrap     string
+		saslMechanism string
+		saslUsername  string
+		saslPassword  string
+		tlsEnabled    bool
+		tlsCA         string
+		tlsSkipVerify bool
+	)
+	c := &cobra.Command{
+		Use:   "update [name]",
+		Short: "Update an existing profile",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			if bootstrap == "" {
+				return fmt.Errorf("--bootstrap-servers is required")
+			}
+			p := config.Profile{
+				Name:             name,
+				BootstrapServers: config.ParseBootstrapServers(bootstrap),
+			}
+			if saslMechanism != "" {
+				p.SASL = &config.SASL{
+					Mechanism: saslMechanism,
+					Username:  saslUsername,
+					Password:  saslPassword,
+				}
+			}
+			if tlsEnabled {
+				p.TLS = &config.TLS{
+					CACert:     tlsCA,
+					SkipVerify: tlsSkipVerify,
+				}
+			}
+			if err := flagApp.UpdateProfile(name, p); err != nil {
+				return err
+			}
+			output(map[string]string{"status": "updated", "profile": name})
+			return nil
+		},
+	}
+	c.Flags().StringVar(&bootstrap, "bootstrap-servers", "", "comma-separated broker addresses (required)")
+	c.Flags().StringVar(&saslMechanism, "sasl-mechanism", "", "SASL mechanism: plain|scram-sha-256|scram-sha-512")
+	c.Flags().StringVar(&saslUsername, "sasl-username", "", "SASL username")
+	c.Flags().StringVar(&saslPassword, "sasl-password", "", "SASL password")
+	c.Flags().BoolVar(&tlsEnabled, "tls", false, "enable TLS")
+	c.Flags().StringVar(&tlsCA, "tls-ca", "", "CA certificate PEM file path")
+	c.Flags().BoolVar(&tlsSkipVerify, "tls-skip-verify", false, "skip server certificate verification")
+	return c
 }
 
 // --- Topic Commands ---
@@ -652,7 +706,7 @@ func newAuditCmd() *cobra.Command {
 		Use:   "audit",
 		Short: "Audit operations",
 	}
-	cmd.AddCommand(auditListCmd(), auditShowCmd(), auditClearCmd())
+	cmd.AddCommand(auditListCmd(), auditShowCmd(), auditClearCmd(), auditDeleteCmd(), auditSnapshotCmd())
 	return cmd
 }
 
@@ -729,6 +783,38 @@ func auditClearCmd() *cobra.Command {
 	return c
 }
 
+func auditDeleteCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "delete [op-id...]",
+		Short: "Delete specific audit operations",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			n, err := flagApp.Audit.DeleteOps(args)
+			if err != nil {
+				return err
+			}
+			output(map[string]interface{}{"status": "deleted", "deleted": n})
+			return nil
+		},
+	}
+}
+
+func auditSnapshotCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "snapshot [op-id]",
+		Short: "Show the bounded snapshot of an operation",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			snap, err := flagApp.GetSnapshot(args[0])
+			if err != nil {
+				return err
+			}
+			output(snap)
+			return nil
+		},
+	}
+}
+
 // --- Schema Command ---
 
 func newSchemaCmd() *cobra.Command {
@@ -737,10 +823,11 @@ func newSchemaCmd() *cobra.Command {
 		Short: "Output machine-readable command schema (JSON)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			schema := map[string]interface{}{
-				"commands": []string{
-					"profile", "topic", "group", "scan", "produce",
-					"session", "audit", "schema", "serve", "desktop",
-				},
+			"commands": []string{
+				"profile", "topic", "group", "scan", "produce",
+				"session", "audit", "schema", "key-partition",
+				"serve", "desktop", "stop", "restart",
+			},
 				"exit_codes": map[string]int{
 					"ok":          0,
 					"param_error": 2,
@@ -753,6 +840,42 @@ func newSchemaCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// --- Key-Partition Command (read-only helper) ---
+
+func newKeyPartitionCmd() *cobra.Command {
+	var (
+		topic   string
+		key     string
+	)
+	c := &cobra.Command{
+		Use:   "key-partition",
+		Short: "Show which partition a key maps to (read-only, no scan)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if topic == "" {
+				return fmt.Errorf("--topic is required")
+			}
+			if key == "" {
+				return fmt.Errorf("--key is required")
+			}
+			partition, count, err := flagApp.KeyPartitionHint(context.Background(), flagProfile, topic, key)
+			if err != nil {
+				return err
+			}
+			output(map[string]interface{}{
+				"topic":            topic,
+				"key":              key,
+				"partition":        partition,
+				"partition_count":  count,
+				"algorithm":        "murmur2(key) & 0x7fffffff % partition_count",
+			})
+			return nil
+		},
+	}
+	c.Flags().StringVar(&topic, "topic", "", "target topic (required)")
+	c.Flags().StringVar(&key, "key", "", "exact message key (required)")
+	return c
 }
 
 // --- Serve / Desktop Commands ---

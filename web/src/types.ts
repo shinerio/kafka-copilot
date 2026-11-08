@@ -94,6 +94,12 @@ export interface ScanRequestBody {
   // Explicit opt-in: narrow the scan to the partition derived from an exact
   // key. Default is false / omitted (scan every partition).
   key_partition?: boolean
+  // Exact offset range (mirrors CLI --offset-from/--offset-to). Mutually
+  // exclusive with `last`; the server zeroes `last` when either is set.
+  offset_from?: number
+  offset_to?: number
+  // Keyword case sensitivity (mirrors CLI --ignore-case). Defaults to true.
+  ignore_case?: boolean
 }
 
 // Read-only display helper: GET /api/key-partition?topic=&key=

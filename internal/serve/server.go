@@ -51,6 +51,9 @@ func (s *Server) registerRoutes() {
 	// Health
 	s.mux.HandleFunc("GET /api/health", s.handleHealth)
 
+	// Schema (machine-readable self-description: command list + exit codes)
+	s.mux.HandleFunc("GET /api/schema", s.handleSchema)
+
 	// Profiles
 	s.mux.HandleFunc("GET /api/profiles", s.handleListProfiles)
 	s.mux.HandleFunc("POST /api/profiles", s.handleAddProfile)
@@ -186,6 +189,14 @@ func parseTimeParam(s string) (int64, error) {
 	return t.UnixMilli(), nil
 }
 
+// derefInt64 returns *v if non-nil, else def.
+func derefInt64(v *int64, def int64) int64 {
+	if v == nil {
+		return def
+	}
+	return *v
+}
+
 func maskProfilePassword(p *config.Profile) {
 	if p.SASL != nil && p.SASL.Password != "" {
 		p.SASL.Password = "****"
@@ -198,6 +209,25 @@ func maskProfilePassword(p *config.Profile) {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// handleSchema mirrors `kp schema`: machine-readable command list + exit codes,
+// so REST clients (and agents) can discover capabilities without hardcoding them.
+func (s *Server) handleSchema(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"commands": []string{
+			"profile", "topic", "group", "scan", "produce",
+			"session", "audit", "schema", "key-partition",
+			"serve", "desktop", "stop", "restart",
+		},
+		"exit_codes": map[string]int{
+			"ok":          0,
+			"param_error": 2,
+			"conn_error":  3,
+			"timeout":     4,
+			"internal":    5,
+		},
+	})
 }
 
 // =============================================================================
@@ -364,7 +394,14 @@ type scanRequest struct {
 	Expr         string  `json:"expr,omitempty"`
 	Partitions   []int32 `json:"partitions,omitempty"`
 	KeyPartition bool    `json:"key_partition,omitempty"`
-	Timeout      int     `json:"timeout,omitempty"`
+	// OffsetFrom/OffsetTo mirror the CLI --offset-from/--offset-to pair.
+	// Pointers are used so an explicit 0 can be distinguished from "absent".
+	OffsetFrom *int64 `json:"offset_from,omitempty"`
+	OffsetTo   *int64 `json:"offset_to,omitempty"`
+	// IgnoreCase mirrors the CLI --ignore-case flag (default true). A pointer
+	// lets the client explicitly request case-sensitive matching (false).
+	IgnoreCase *bool `json:"ignore_case,omitempty"`
+	Timeout    int    `json:"timeout,omitempty"`
 }
 
 func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
@@ -389,7 +426,7 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		Partitions:   body.Partitions,
 		KeyPartition: body.KeyPartition,
 		TimeoutSec:   body.Timeout,
-		IgnoreCase:   true,
+		IgnoreCase:   body.IgnoreCase == nil || *body.IgnoreCase,
 	}
 
 	if body.Since != "" {
@@ -411,7 +448,14 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		req.HasTimeWindow = true
 	}
 
-	if req.Last == 0 && !req.HasTimeWindow {
+	if body.OffsetFrom != nil || body.OffsetTo != nil {
+		req.OffsetFrom = derefInt64(body.OffsetFrom, 0)
+		req.OffsetTo = derefInt64(body.OffsetTo, 0)
+		req.HasOffsetRange = true
+		req.Last = 0 // offset range and last are mutually exclusive
+	}
+
+	if req.Last == 0 && !req.HasTimeWindow && !req.HasOffsetRange {
 		req.Last = 100 // default backscan
 	}
 

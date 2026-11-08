@@ -159,6 +159,12 @@ export function ScanPage({ profile }: { profile: string }) {
   const [keyword, setKeyword] = useState('')
   const [expr, setExpr] = useState('')
   const [partitions, setPartitions] = useState<number[]>([])
+  // Exact offset-range scanning (mirrors CLI --offset-from/--offset-to).
+  // Stored as strings so an empty input stays distinguishable from 0.
+  const [offsetFrom, setOffsetFrom] = useState('')
+  const [offsetTo, setOffsetTo] = useState('')
+  // Keyword case sensitivity (mirrors CLI --ignore-case, default on).
+  const [ignoreCase, setIgnoreCase] = useState(true)
   const [running, setRunning] = useState(false)
   const [result, setResult] = useState<ScanResult | null>(null)
   const [error, setError] = useState<unknown>(null)
@@ -278,6 +284,11 @@ export function ScanPage({ profile }: { profile: string }) {
               ? partitions
               : undefined,
         key_partition: keyLocate && keyLocEligible && keyLocInfo ? true : undefined,
+        // Exact offset range (mutually exclusive with --last): only sent when
+        // the user actually typed something, so an explicit 0 is preserved.
+        offset_from: offsetFrom.trim() !== '' ? Number(offsetFrom) : undefined,
+        offset_to: offsetTo.trim() !== '' ? Number(offsetTo) : undefined,
+        ignore_case: ignoreCase,
       })
       setResult(res)
     } catch (e) {
@@ -331,12 +342,12 @@ export function ScanPage({ profile }: { profile: string }) {
               onChange={(e) => setKey(e.target.value)}
             />
           </Field>
-          <Field label="--keyword (支持 AND/OR/NOT 与括号)">
+          <Field label="--keyword (子串匹配，支持 AND/OR/NOT 与括号)">
             <input
               className="kp-datetime"
               style={{ height: 32, fontFamily: 'var(--kp-font-mono)' }}
               value={keyword}
-              placeholder='如: FAILED AND (amount>100 OR retry)'
+              placeholder='如: FAILED AND (timeout OR retry)'
               onChange={(e) => setKeyword(e.target.value)}
             />
           </Field>
@@ -351,6 +362,24 @@ export function ScanPage({ profile }: { profile: string }) {
           </Field>
           <DateTimeField label="Since" value={since} onChange={setSince} />
           <DateTimeField label="Until" value={until} onChange={setUntil} />
+          <Field label="--offset-from (精确起点, 与回扫量互斥)">
+            <input
+              className="kp-datetime"
+              style={{ height: 32, fontFamily: 'var(--kp-font-mono)' }}
+              value={offsetFrom}
+              placeholder="如 12345"
+              onChange={(e) => setOffsetFrom(e.target.value)}
+            />
+          </Field>
+          <Field label="--offset-to (精确终点)">
+            <input
+              className="kp-datetime"
+              style={{ height: 32, fontFamily: 'var(--kp-font-mono)' }}
+              value={offsetTo}
+              placeholder="如 67890"
+              onChange={(e) => setOffsetTo(e.target.value)}
+            />
+          </Field>
         </div>
         {/* Explicit, visible key-location switch. Off by default; the risk
             list spells out why "no partition expansion" is necessary but NOT
@@ -433,6 +462,11 @@ export function ScanPage({ profile }: { profile: string }) {
           <Button appearance="primary" onClick={run} disabled={running || !topic}>
             {running ? '扫描中…' : '扫描'}
           </Button>
+          <Switch
+            checked={ignoreCase}
+            onChange={(_, d) => setIgnoreCase(d.checked)}
+            label="关键字忽略大小写（默认开）"
+          />
           {running && <span className="kp-spinner" />}
           {last > 1000 && (
             <Body1 className="kp-muted kp-last-warning">

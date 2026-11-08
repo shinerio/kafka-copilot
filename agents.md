@@ -5,6 +5,33 @@
 
 ---
 
+## 0. 文档索引（先看这里）
+
+> 设计文档已由单文件（v1.5，898 行）拆为「总览 + 主题分册」，**逐行迁移、零删改**。完整索引、章节映射与同步清单见 `docs/README.md`；拆分前完整原文保存在 `docs/archive/kafka-pilot-设计文档-v1.5-拆分前快照.md`。
+
+| 文件 | 内容 | 原章节 | 何时读 |
+|---|---|---|---|
+| `docs/kafka-pilot-设计文档.md` | 全局总览：文档信息、变更记录、关键决策 D1~D18、图表约定、分册索引 | §一 | 入口 |
+| `docs/00-项目总览与需求.md` | 背景目标、术语、角色场景、需求范围 | §二~§五 | 了解边界 |
+| `docs/01-总体架构与内核模块.md` | 分层架构、内核模块与依赖方向、关键流程、技术选型 | §七 / §八 / §十二 / §十四 | 改架构、加模块 |
+| `docs/02-功能需求-查询与注入.md` | FR-01~FR-08：topic / group / 查询 / 三层过滤 / 扫描边界 / 注入 | §六 前半 | 改 scan / filter / produce |
+| `docs/03-功能需求-审计与配置.md` | FR-09~FR-16：审计、会话、操作区 / 观测区、Profile、schema、缓存设计稿、数据目录 | §六 后半 | 改 audit / config |
+| `docs/04-接口契约-CLI与REST.md` | CLI 命令清单、输出契约、SKILL 要点 | §九 | 改 CLI / REST / SKILL |
+| `docs/05-界面设计.md` | 界面形态、信息架构、交互、实现基线 | §十 | 改 Web UI |
+| `docs/06-数据存储与保留策略.md` | 存储布局、核心表、保留策略 | §十一 | 改 SQLite / 数据目录 |
+| `docs/07-非功能与交付.md` | 非功能、风险、版本规划、RTM、假设确认 | §十三 / §十五~§十八 | 评审 / 排期 |
+| `docs/kafka-pilot-本地缓存详细设计.md` | **FR-15 本地缓存现行设计基线**：严格模式、双上限与物理兜底、对账协议、双端契约、G1~G18 验收 | 独立详设 v1.0 | 实现缓存 |
+| `docs/figures/` | 架构图 1~5 PNG + drawio 源文件（读取 / 修改必须经 drawio MCP） | — | 改架构时 |
+
+**关键规则**
+
+1. 分册沿用原 `§x` / `FR-xx` 编号，变更记录、RTM、`README.md`、`skill/SKILL.md` 中的交叉引用继续有效，按上表定位分册即可。
+2. FR-15 以 `kafka-pilot-本地缓存详细设计.md` 为准；`03` 分册内的 FR-15 是 v1.4 历史草稿，仅作溯源、不用于实现。
+3. 图纸变更走 drawio MCP 并重新导出 PNG；界面变更以 `web/src` 为唯一基线。
+4. 改动任一设计能力，除改对应分册外，仍须按 §7 同步总览变更记录、`README.md` 命令参考与 `skill/SKILL.md`。
+
+---
+
 ## 1. 项目概览
 
 Kafka Pilot（`kp`）是一个**单二进制**的 Kafka 数据工具：查数、造数、只读观测，CLI 与本地 Web UI 双端共用同一套内核。
@@ -14,7 +41,7 @@ Kafka Pilot（`kp`）是一个**单二进制**的 Kafka 数据工具：查数、
 | 语言 | Go（内核 + CLI）+ TypeScript/React（前端），前端经 `embed.FS` 打进同一个二进制 |
 | 分发物 | 始终只有一个 `kp`（或 `kp.exe`） |
 | 目标环境 | 开发 / 测试环境自用，弱权限、重效率；服务只监听 `127.0.0.1` |
-| 设计基线 | `docs/kafka-pilot-设计文档.md`（含变更记录与 FR 编号），架构图在 `docs/figures/`（经 drawio MCP 维护） |
+| 设计基线 | 文档集，索引见本文 §0 与 `docs/README.md`；总览（变更记录 / 决策 / FR 编号）在 `docs/kafka-pilot-设计文档.md`，架构图在 `docs/figures/`（经 drawio MCP 维护） |
 
 **三大模块（本文核心）**
 
@@ -93,7 +120,8 @@ kafka-pilot/
 │   ├── src/api.ts          #   本地 REST/SSE 客户端
 │   ├── vite.config.ts      #   outDir: ../internal/serve/dist
 │   └── package.json
-├── docs/                   # 技术文档（设计文档 + 架构图 PNG/drawio）
+├── docs/                   # 设计文档集（总览 + 00~07 分册 + 缓存详设 + archive/），索引见 docs/README.md
+│   └── figures/            #   架构图 PNG/drawio（读改必须经 drawio MCP）
 ├── skill/SKILL.md          # AI Agent 使用 kp 的契约（必须随能力同步更新）
 └── README.md               # 用户手册（命令参考）
 ```
@@ -222,7 +250,7 @@ cd web && npm run lint                 # oxlint 前端静态检查
 
 - **CLI 与 Web（REST）能力必须双向对称（第一红线前的硬约束）**：新增或改动任何「非 CLI 专属」（见 §5.9）的能力时，**必须同时在 `internal/app` + CLI(`cmd/kp`) + REST(`internal/serve`) 三处落地**，并保证三者语义、字段、退出码一致；Web UI 只是 REST 的消费者，自然随之具备同等能力。任何一侧独有的能力都视为缺陷，需补齐，不得任其漂移。
 - **技术文档必须随代码同步更新**。功能新增、行为变更、bug 修复落地后，不得只改代码不更文档。
-  - 设计文档遵循既有「变更记录」表格，新增一行：`版本号 · 日期 · 变更摘要 · 备注（用户反馈 / 自查）`。
+  - 设计文档遵循既有「变更记录」表格（位于总览 `docs/kafka-pilot-设计文档.md`），新增一行：`版本号 · 日期 · 变更摘要 · 备注（用户反馈 / 自查）`；按本文 §0 索引定位需同步的分册，不要在 `docs/archive/` 快照里追加变更。
   - 架构图变更走 drawio MCP 重新导出 PNG，保证图文一致。
   - `README.md` 的命令参考（§5）与 CLI 实际行为保持一致。
 - **`skill/SKILL.md` 是 AI Agent 使用 kp 的契约**，必须随「kp 暴露的能力」同步更新：
